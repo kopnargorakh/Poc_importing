@@ -137,6 +137,7 @@ jobs:
           STAGING_GATEWAY_URL: ${{ secrets.STAGING_GATEWAY_URL }}
           STAGING_GATEWAY_USER: ${{ secrets.STAGING_GATEWAY_USER }}
           STAGING_GATEWAY_PASS: ${{ secrets.STAGING_GATEWAY_PASS }}
+          STAGING_DB_URL: ${{ secrets.STAGING_DB_URL }}
 
   deploy-prod:
     name: Deploy to Production
@@ -182,6 +183,7 @@ jobs:
           PROD_GATEWAY_URL: ${{ secrets.PROD_GATEWAY_URL }}
           PROD_GATEWAY_USER: ${{ secrets.PROD_GATEWAY_USER }}
           PROD_GATEWAY_PASS: ${{ secrets.PROD_GATEWAY_PASS }}
+          PROD_DB_URL: ${{ secrets.PROD_DB_URL }}
 
       - name: Run Production Smoke Tests
         run: |
