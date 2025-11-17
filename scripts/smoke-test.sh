@@ -31,6 +31,24 @@ echo "=========================================="
 echo "Gateway: $GATEWAY_URL"
 echo ""
 
+# Wait for gateway to be responsive (in case it was just restarted)
+echo "Waiting for gateway to be ready..."
+MAX_WAIT=60
+WAIT_COUNT=0
+while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
+  if curl -s -f "${GATEWAY_URL}/StatusPing" > /dev/null 2>&1; then
+    echo "Gateway is ready (waited ${WAIT_COUNT}s)"
+    break
+  fi
+  sleep 1
+  WAIT_COUNT=$((WAIT_COUNT + 1))
+done
+
+if [ $WAIT_COUNT -ge $MAX_WAIT ]; then
+  echo "⚠ Warning: Gateway did not become ready within ${MAX_WAIT}s"
+fi
+echo ""
+
 EXIT_CODE=0
 
 # Test 1: Gateway Status Ping
