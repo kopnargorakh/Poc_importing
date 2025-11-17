@@ -9,6 +9,8 @@ on:
       - develop
       - release/**
       - main
+    tags:
+      - v*
   pull_request:
     branches:
       - develop
