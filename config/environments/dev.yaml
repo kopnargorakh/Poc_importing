@@ -1,6 +1,7 @@
 ---
 # Development Environment Configuration
 environment: dev
+deploy_root: /Users/jasperlouage/_docker/ignition-83-cicd-mustry
 gateway:
   url: http://localhost:8088
   username: admin

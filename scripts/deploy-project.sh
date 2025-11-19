@@ -34,7 +34,15 @@ if [ ! -f "$CONFIG_FILE" ]; then
 fi
 
 # Parse configuration
+DEPLOY_ROOT=$(grep "^deploy_root:" "$CONFIG_FILE" | awk '{print $2}')
 CONTAINER_NAME=$(grep "container_name:" "$CONFIG_FILE" | awk '{print $2}')
+
+# Use deploy_root if specified, otherwise use PROJECT_ROOT
+if [ -n "$DEPLOY_ROOT" ]; then
+  DEPLOY_TARGET="$DEPLOY_ROOT"
+else
+  DEPLOY_TARGET="$PROJECT_ROOT"
+fi
 
 # Determine project name and prepare source
 if [ "$IS_ZIP" = true ]; then
@@ -70,7 +78,7 @@ case "$ENVIRONMENT" in
 esac
 
 # Deploy to mounted directory (curated approach)
-DEPLOY_DIR="$PROJECT_ROOT/services/$ENV_DIR/projects/$PROJECT_NAME"
+DEPLOY_DIR="$DEPLOY_TARGET/services/$ENV_DIR/projects/$PROJECT_NAME"
 
 echo "Deploying to: $DEPLOY_DIR"
 

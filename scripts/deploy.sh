@@ -29,11 +29,21 @@ echo "=========================================="
 echo ""
 
 # Parse YAML config (basic parsing - in production, use yq or similar)
+DEPLOY_ROOT=$(grep "^deploy_root:" "$CONFIG_FILE" | awk '{print $2}')
 GATEWAY_URL=$(grep "url:" "$CONFIG_FILE" | head -1 | awk '{print $2}')
 GATEWAY_USER=$(grep "username:" "$CONFIG_FILE" | head -1 | awk '{print $2}')
 GATEWAY_PASS=$(grep "password:" "$CONFIG_FILE" | head -1 | awk '{print $2}')
 CONTAINER_NAME=$(grep "container_name:" "$CONFIG_FILE" | awk '{print $2}')
 AUTO_BACKUP=$(grep "auto_backup:" "$CONFIG_FILE" | awk '{print $2}')
+
+# Use deploy_root if specified, otherwise use PROJECT_ROOT
+if [ -n "$DEPLOY_ROOT" ]; then
+  echo "Using deploy root: $DEPLOY_ROOT"
+  DEPLOY_TARGET="$DEPLOY_ROOT"
+else
+  echo "Using project root: $PROJECT_ROOT"
+  DEPLOY_TARGET="$PROJECT_ROOT"
+fi
 
 echo "Gateway URL: $GATEWAY_URL"
 echo "Container: $CONTAINER_NAME"
@@ -80,9 +90,9 @@ if [ -d "$CONFIG_SOURCE" ]; then
       ;;
   esac
 
-  CONFIG_TARGET="$PROJECT_ROOT/services/$ENV_DIR/config"
+  CONFIG_TARGET="$DEPLOY_TARGET/services/$ENV_DIR/config"
   echo "  Copying config from: config/gateway/"
-  echo "  To: services/$ENV_DIR/config/"
+  echo "  To: $CONFIG_TARGET"
 
   # Create target directory
   mkdir -p "$CONFIG_TARGET"

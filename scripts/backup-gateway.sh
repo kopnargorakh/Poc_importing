@@ -44,23 +44,24 @@ echo "Backup file: $BACKUP_FILE"
 # This creates a backup using Ignition's built-in backup functionality
 docker exec "$CONTAINER_NAME" sh -c "
   cd /usr/local/bin/ignition
-  ./gwcmd.sh --backup '$BACKUP_FILE' --username '$GATEWAY_USER' --password '$GATEWAY_PASS'
-" 2>/dev/null || echo "Note: gwcmd backup may require gateway configuration"
+  ./gwcmd.sh --backup /backups/$BACKUP_FILE --promptyes --timeout 120
+" > /dev/null 2>&1 || echo "  ⚠ gwcmd backup skipped (requires gateway configuration)"
 
 # Method 2: Copy the entire data directory (alternative approach)
 echo "Creating filesystem backup..."
-docker cp "${CONTAINER_NAME}:/usr/local/bin/ignition/data" "$PROJECT_ROOT/$BACKUP_PATH/data_backup_${TIMESTAMP}" 2>/dev/null || echo "Filesystem backup skipped"
+docker cp "${CONTAINER_NAME}:/usr/local/bin/ignition/data" "$PROJECT_ROOT/$BACKUP_PATH/data_backup_${TIMESTAMP}" > /dev/null 2>&1 && echo "  ✓ Filesystem backup created" || echo "  ⚠ Filesystem backup skipped"
 
 # Method 3: Export individual projects via REST API (if available in Ignition 8.3)
-echo "Attempting to export projects..."
+echo "Attempting to export projects via API..."
 mkdir -p "$PROJECT_ROOT/$BACKUP_PATH/projects_${TIMESTAMP}"
 
 # Get list of projects (this requires proper API authentication)
 # Note: Adjust API endpoint based on your Ignition version
 curl -s -u "${GATEWAY_USER}:${GATEWAY_PASS}" \
   "${GATEWAY_URL}/system/webdev/projects" \
-  -o "$PROJECT_ROOT/$BACKUP_PATH/projects_${TIMESTAMP}/project_list.json" 2>/dev/null || \
-  echo "Project export via API not available"
+  -o "$PROJECT_ROOT/$BACKUP_PATH/projects_${TIMESTAMP}/project_list.json" 2>/dev/null && \
+  echo "  ✓ Project list exported" || \
+  echo "  ⚠ Project export via API not available"
 
 # Clean up old backups (keep last N backups based on retention policy)
 RETENTION_DAYS=$(grep "backup_retention_days:" "$CONFIG_FILE" | awk '{print $2}')
