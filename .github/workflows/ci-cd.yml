@@ -92,6 +92,12 @@ jobs:
       name: development
 
     steps:
+      - name: Clean Previous Build Artifacts
+        run: |
+          echo "Cleaning previous build artifacts..."
+          rm -rf build/
+          mkdir -p build/
+
       - name: Restore Build Cache
         uses: actions/cache/restore@v4
         with:
@@ -129,6 +135,12 @@ jobs:
       name: staging
 
     steps:
+      - name: Clean Previous Build Artifacts
+        run: |
+          echo "Cleaning previous build artifacts..."
+          rm -rf build/
+          mkdir -p build/
+
       - name: Restore Build Cache
         uses: actions/cache/restore@v4
         with:
@@ -175,6 +187,12 @@ jobs:
       name: production
 
     steps:
+      - name: Clean Previous Build Artifacts
+        run: |
+          echo "Cleaning previous build artifacts..."
+          rm -rf build/
+          mkdir -p build/
+
       - name: Restore Build Cache
         uses: actions/cache/restore@v4
         with:

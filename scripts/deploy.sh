@@ -88,7 +88,7 @@ if [ -d "$CONFIG_SOURCE" ]; then
   mkdir -p "$CONFIG_TARGET"
 
   # Copy configuration files (rsync preserves structure and only copies changes)
-  rsync -av --delete \
+  rsync -a --delete \
     --exclude='local/' \
     --exclude='resources/local/' \
     --exclude='.resources/' \
