@@ -114,14 +114,25 @@ echo ""
 echo "Step 5: Deploying Ignition projects..."
 BUILD_DIR="$PROJECT_ROOT/build"
 if [ -d "$BUILD_DIR" ]; then
-  for project_zip in "$BUILD_DIR"/*.zip; do
-    if [ -f "$project_zip" ]; then
-      project_name=$(basename "$project_zip" .zip)
-      echo "  Deploying $project_name..."
-      "$SCRIPT_DIR/deploy-project.sh" "$ENVIRONMENT" "$project_zip"
-      echo "  ✓ $project_name deployed"
+  # Check for no-projects marker
+  if [ -f "$BUILD_DIR/.no-projects" ]; then
+    echo "  ℹ No projects to deploy (config-only deployment)"
+  else
+    project_count=0
+    for project_zip in "$BUILD_DIR"/*.zip; do
+      if [ -f "$project_zip" ]; then
+        project_name=$(basename "$project_zip" .zip)
+        echo "  Deploying $project_name..."
+        "$SCRIPT_DIR/deploy-project.sh" "$ENVIRONMENT" "$project_zip"
+        echo "  ✓ $project_name deployed"
+        project_count=$((project_count + 1))
+      fi
+    done
+
+    if [ $project_count -eq 0 ]; then
+      echo "  ℹ No project packages found"
     fi
-  done
+  fi
 else
   echo "⚠ No build artifacts found in $BUILD_DIR"
 fi

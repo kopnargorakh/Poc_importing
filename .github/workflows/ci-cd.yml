@@ -53,20 +53,23 @@ jobs:
           set -e
           echo "Packaging all Ignition projects..."
 
-          if [ ! -d "projects" ]; then
-            echo "No projects directory found, creating placeholder..."
-            mkdir -p projects/example-project
-            echo '{"version": "1.0.0", "name": "example-project"}' > projects/example-project/project.json
+          # Clean build directory to remove old artifacts
+          rm -rf build/
+          mkdir -p build/
+
+          if [ ! -d "projects" ] || [ -z "$(ls -A projects 2>/dev/null)" ]; then
+            echo "No projects found, creating marker file..."
+            echo "no-projects" > build/.no-projects
+          else
+            chmod +x ./scripts/package-project.sh
+
+            for dir in projects/*/; do
+              if [ -d "$dir" ]; then
+                echo "Packaging $(basename $dir)..."
+                ./scripts/package-project.sh "$dir"
+              fi
+            done
           fi
-
-          chmod +x ./scripts/package-project.sh
-
-          for dir in projects/*/; do
-            if [ -d "$dir" ]; then
-              echo "Packaging $(basename $dir)..."
-              ./scripts/package-project.sh "$dir"
-            fi
-          done
 
           ls -lh build/
 
