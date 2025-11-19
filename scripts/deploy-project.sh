@@ -107,9 +107,9 @@ esac
 
 # Function to wait for gateway to be ready
 wait_for_gateway() {
-  local max_attempts=60
+  local max_attempts=3
   local attempt=1
-  echo "Waiting for gateway to be ready..."
+  echo "Waiting for gateway to be ready (max 5 seconds)..."
 
   while [ $attempt -le $max_attempts ]; do
     if curl -s -f "${GATEWAY_URL}/StatusPing" > /dev/null 2>&1; then
@@ -121,7 +121,7 @@ wait_for_gateway() {
     attempt=$((attempt + 1))
   done
 
-  echo "Warning: Gateway did not become ready within expected time"
+  echo "ERROR: Gateway did not become ready within 5 seconds"
   return 1
 }
 
@@ -153,12 +153,22 @@ docker restart "$CONTAINER_NAME" > /dev/null
 # Wait for gateway and trigger scans
 if wait_for_gateway; then
   trigger_ignition_scans
+  echo ""
+  echo "✓ Project deployed successfully!"
+  echo "  Project: $PROJECT_NAME"
+  echo "  Environment: $ENVIRONMENT ($ENV_DIR)"
+  echo "  Location: services/$ENV_DIR/projects/$PROJECT_NAME"
+  echo "  Gateway URL: ${GATEWAY_URL}/web/home"
+  echo ""
+else
+  echo ""
+  echo "✗ Project deployment FAILED - Gateway did not become ready"
+  echo "  Project: $PROJECT_NAME"
+  echo "  Environment: $ENVIRONMENT ($ENV_DIR)"
+  echo "  Location: services/$ENV_DIR/projects/$PROJECT_NAME"
+  echo ""
+  echo "  The project files were copied but the gateway could not be verified."
+  echo "  You may need to manually restart the gateway or check logs."
+  echo ""
+  exit 1
 fi
-
-echo ""
-echo "✓ Project deployed successfully!"
-echo "  Project: $PROJECT_NAME"
-echo "  Environment: $ENVIRONMENT ($ENV_DIR)"
-echo "  Location: services/$ENV_DIR/projects/$PROJECT_NAME"
-echo "  Gateway URL: ${GATEWAY_URL}/web/home"
-echo ""
