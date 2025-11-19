@@ -9,29 +9,29 @@ services:
     restart: unless-stopped
     ports:
       - "8088:8088"  # HTTP port
-      - "8043:8043"  # HTTPS port
-      - "8060:8060"  # Gateway Network port
+      - "7043:8043"  # HTTPS port
+      - "7060:8060"  # Gateway Network port
     volumes:
       # Curated configuration mounts (additive approach)
       - ./services/ignition-dev/config:/usr/local/bin/ignition/data/config
       - ./services/ignition-dev/projects:/usr/local/bin/ignition/data/projects
       - ./backups/dev:/backups
+      # Secrets management
+      - ./secrets/gateway_admin_password.txt:/run/secrets/gateway_admin_password:ro
     environment:
       - ACCEPT_IGNITION_EULA=Y
       - GATEWAY_ADMIN_USERNAME=admin
-      - GATEWAY_ADMIN_PASSWORD=dev-password
+      - GATEWAY_ADMIN_PASSWORD_FILE=/run/secrets/gateway_admin_password
       - IGNITION_EDITION=standard
       - GATEWAY_MODULES_ENABLED=alarm-notification,reporting,opc-ua,perspective,sms-notification,symbol-factory,tag-historian,udp-tcp-drivers,web-developer
       - IGNITION_UID=1000
       - IGNITION_GID=1000
       - TZ=Europe/Brussels
       - GATEWAY_NETWORK_ENABLED=true
+      - GATEWAY_RESTORE_DISABLED=true
     command: >
       -n ignition-dev
       -m 4096
-      -a 0.0.0.0
-      -h 8088
-      -s 8043
       --
       wrapper.java.initmemory=1024
       -Dignition.allowunsignedmodules=true
@@ -69,22 +69,22 @@ services:
       - ./services/ignition-staging/config:/usr/local/bin/ignition/data/config
       - ./services/ignition-staging/projects:/usr/local/bin/ignition/data/projects
       - ./backups/staging:/backups
+      # Secrets management
+      - ./secrets/gateway_admin_password.txt:/run/secrets/gateway_admin_password:ro
     environment:
       - ACCEPT_IGNITION_EULA=Y
       - GATEWAY_ADMIN_USERNAME=admin
-      - GATEWAY_ADMIN_PASSWORD=staging-password
+      - GATEWAY_ADMIN_PASSWORD_FILE=/run/secrets/gateway_admin_password
       - IGNITION_EDITION=standard
       - GATEWAY_MODULES_ENABLED=alarm-notification,reporting,opc-ua,perspective,sms-notification,symbol-factory,tag-historian,udp-tcp-drivers,web-developer
       - IGNITION_UID=1000
       - IGNITION_GID=1000
       - TZ=Europe/Brussels
       - GATEWAY_NETWORK_ENABLED=true
+      - GATEWAY_RESTORE_DISABLED=true
     command: >
       -n ignition-staging
       -m 4096
-      -a 0.0.0.0
-      -h 8088
-      -s 8043
       --
       wrapper.java.initmemory=1024
       -Dignition.allowunsignedmodules=true
@@ -122,22 +122,22 @@ services:
       - ./services/ignition-prod/config:/usr/local/bin/ignition/data/config
       - ./services/ignition-prod/projects:/usr/local/bin/ignition/data/projects
       - ./backups/prod:/backups
+      # Secrets management
+      - ./secrets/gateway_admin_password.txt:/run/secrets/gateway_admin_password:ro
     environment:
       - ACCEPT_IGNITION_EULA=Y
       - GATEWAY_ADMIN_USERNAME=admin
-      - GATEWAY_ADMIN_PASSWORD=prod-password
+      - GATEWAY_ADMIN_PASSWORD_FILE=/run/secrets/gateway_admin_password
       - IGNITION_EDITION=standard
       - GATEWAY_MODULES_ENABLED=alarm-notification,reporting,opc-ua,perspective,sms-notification,symbol-factory,tag-historian,udp-tcp-drivers,web-developer
       - IGNITION_UID=1000
       - IGNITION_GID=1000
       - TZ=Europe/Brussels
       - GATEWAY_NETWORK_ENABLED=true
+      - GATEWAY_RESTORE_DISABLED=true
     command: >
       -n ignition-prod
       -m 4096
-      -a 0.0.0.0
-      -h 8088
-      -s 8043
       --
       wrapper.java.initmemory=1024
       -Dignition.allowunsignedmodules=true
@@ -171,10 +171,11 @@ services:
     environment:
       - POSTGRES_DB=ignition
       - POSTGRES_USER=ignition
-      - POSTGRES_PASSWORD=ignition-db-password
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./migrations:/migrations
+      # Secrets management
+      - ./secrets/postgres_password.txt:/run/secrets/postgres_password:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ignition"]
       interval: 10s

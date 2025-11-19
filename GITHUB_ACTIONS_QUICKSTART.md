@@ -50,7 +50,7 @@ This guide will walk you through setting up the complete CI/CD pipeline in GitHu
 
    | Secret Name | Value | Notes |
    |------------|-------|-------|
-   | `DEV_GATEWAY_URL` | `http://localhost:8088` | Development gateway URL |
+   | `DEV_GATEWAY_URL` | `http://localhost:7088` | Development gateway URL |
    | `DEV_GATEWAY_USER` | `admin` | Development admin username |
    | `DEV_GATEWAY_PASS` | `dev-password` | Development admin password |
    | `STAGING_GATEWAY_URL` | `http://localhost:8188` | Staging gateway URL |
@@ -156,7 +156,7 @@ This guide will walk you through setting up the complete CI/CD pipeline in GitHu
    - All workflow runs should be green ✅
 
 2. **Check Deployed Projects** (if using local Docker)
-   - Dev: http://localhost:8088/web/home
+   - Dev: http://localhost:7088/web/home
    - Staging: http://localhost:8188/web/home
    - Production: http://localhost:8288/web/home
 

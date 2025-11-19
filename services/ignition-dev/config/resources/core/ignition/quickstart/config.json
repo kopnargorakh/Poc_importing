@@ -1,12 +1,12 @@
 {
-  "finished": false,
+  "finished": true,
   "steps": [
     {
-      "completed": false,
+      "completed": true,
       "name": "INSTALL"
     },
     {
-      "completed": false,
+      "completed": true,
       "name": "ENABLED"
     },
     {
@@ -14,11 +14,11 @@
       "name": "DESIGNER"
     },
     {
-      "completed": false,
+      "completed": true,
       "name": "PROJECT"
     },
     {
-      "completed": false,
+      "completed": true,
       "name": "SESSION"
     }
   ]
