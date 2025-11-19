@@ -36,6 +36,8 @@ fi
 # Parse configuration
 DEPLOY_ROOT=$(grep "^deploy_root:" "$CONFIG_FILE" | awk '{print $2}')
 CONTAINER_NAME=$(grep "container_name:" "$CONFIG_FILE" | awk '{print $2}')
+GATEWAY_URL=$(grep "url:" "$CONFIG_FILE" | head -1 | awk '{print $2}')
+API_KEY=$(grep "api_key:" "$CONFIG_FILE" | head -1 | awk '{print $2}')
 
 # Use deploy_root if specified, otherwise use PROJECT_ROOT
 if [ -n "$DEPLOY_ROOT" ]; then
@@ -74,25 +76,26 @@ echo "Deploying Project: $PROJECT_NAME"
 echo "Environment: $ENVIRONMENT"
 echo "=========================================="
 
-# Map environment to service directory
+# Map environment to deployment directory
 case "$ENVIRONMENT" in
+  local)
+    # Local mounts ./projects/ directly - deploy to source
+    DEPLOY_DIR="$DEPLOY_TARGET/projects/$PROJECT_NAME"
+    ;;
   dev|development)
-    ENV_DIR="ignition-dev"
+    DEPLOY_DIR="$DEPLOY_TARGET/services/ignition-dev/projects/$PROJECT_NAME"
     ;;
   staging)
-    ENV_DIR="ignition-staging"
+    DEPLOY_DIR="$DEPLOY_TARGET/services/ignition-staging/projects/$PROJECT_NAME"
     ;;
   prod|production)
-    ENV_DIR="ignition-prod"
+    DEPLOY_DIR="$DEPLOY_TARGET/services/ignition-prod/projects/$PROJECT_NAME"
     ;;
   *)
     echo "Error: Unknown environment: $ENVIRONMENT"
     exit 1
     ;;
 esac
-
-# Deploy to mounted directory (curated approach)
-DEPLOY_DIR="$DEPLOY_TARGET/services/$ENV_DIR/projects/$PROJECT_NAME"
 
 echo "Deploying to: $DEPLOY_DIR"
 
@@ -113,19 +116,6 @@ cp -r "$SOURCE_DIR" "$DEPLOY_DIR"
 if [ "$IS_ZIP" = true ]; then
   rm -rf "$TEMP_DIR"
 fi
-
-# Determine gateway URL based on environment
-case "$ENVIRONMENT" in
-  dev|development)
-    GATEWAY_URL="http://localhost:8088"
-    ;;
-  staging)
-    GATEWAY_URL="http://localhost:8188"
-    ;;
-  prod|production)
-    GATEWAY_URL="http://localhost:8288"
-    ;;
-esac
 
 # Function to wait for gateway to be ready
 wait_for_gateway() {
@@ -151,9 +141,16 @@ wait_for_gateway() {
 trigger_ignition_scans() {
   echo "Triggering Ignition resource scans..."
 
+  # Check if API key is configured
+  if [ -z "$API_KEY" ]; then
+    echo "  ⚠ No API key configured, skipping resource scans"
+    echo "    Note: Gateway will auto-detect changes, but may take longer"
+    return 0
+  fi
+
   # Trigger config scan
   echo "  - Scanning gateway configuration..."
-  if curl -s -X POST "${GATEWAY_URL}/data/api/v1/scan/config" > /dev/null 2>&1; then
+  if curl -s -H "X-Ignition-API-Token: $API_KEY" -X POST "${GATEWAY_URL}/data/api/v1/scan/config" > /dev/null 2>&1; then
     echo "    ✓ Config scan triggered"
   else
     echo "    ⚠ Config scan failed (gateway may handle this automatically)"
@@ -161,7 +158,7 @@ trigger_ignition_scans() {
 
   # Trigger projects scan
   echo "  - Scanning projects..."
-  if curl -s -X POST "${GATEWAY_URL}/data/api/v1/scan/projects" > /dev/null 2>&1; then
+  if curl -s -H "X-Ignition-API-Token: $API_KEY" -X POST "${GATEWAY_URL}/data/api/v1/scan/projects" > /dev/null 2>&1; then
     echo "    ✓ Projects scan triggered"
   else
     echo "    ⚠ Projects scan failed (gateway may handle this automatically)"
@@ -190,7 +187,7 @@ trigger_ignition_scans
 echo ""
 echo "✓ Project deployed successfully!"
 echo "  Project: $PROJECT_NAME"
-echo "  Environment: $ENVIRONMENT ($ENV_DIR)"
-echo "  Location: services/$ENV_DIR/projects/$PROJECT_NAME"
+echo "  Environment: $ENVIRONMENT"
+echo "  Location: $DEPLOY_DIR"
 echo "  Gateway URL: ${GATEWAY_URL}/web/home"
 echo ""
