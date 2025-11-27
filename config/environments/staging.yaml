@@ -5,7 +5,7 @@ gateway:
   url: http://localhost:8188
   username: admin
   password: Test123!  
-  api_key: cicd:cicd:sMwrq8GV0e16T6yzpY9_5iejY6wO_6ddHY__RKb-ksM
+  api_key: cicd:sMwrq8GV0e16T6yzpY9_5iejY6wO_6ddHY__RKb-ksM
   container_name: ignition-staging
   backup_path: ./backups/staging
 database:

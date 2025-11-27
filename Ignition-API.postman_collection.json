@@ -1,0 +1,106 @@
+{
+	"info": {
+		"_postman_id": "ignition-api-collection",
+		"name": "Ignition Gateway API",
+		"description": "API endpoints for Ignition Gateway resource scanning and health checks",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "gateway_url",
+			"value": "http://localhost:8088",
+			"type": "string"
+		},
+		{
+			"key": "api_key",
+			"value": "your-api-key-here",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Health Check",
+			"item": [
+				{
+					"name": "Status Ping",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_url}}/StatusPing",
+							"host": [
+								"{{gateway_url}}"
+							],
+							"path": [
+								"StatusPing"
+							]
+						},
+						"description": "Check if the Ignition gateway is running and healthy"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Resource Scans",
+			"item": [
+				{
+					"name": "Scan Gateway Config",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-Ignition-API-Token",
+								"value": "{{api_key}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{gateway_url}}/data/api/v1/scan/config",
+							"host": [
+								"{{gateway_url}}"
+							],
+							"path": [
+								"data",
+								"api",
+								"v1",
+								"scan",
+								"config"
+							]
+						},
+						"description": "Trigger a gateway configuration scan to detect changes"
+					},
+					"response": []
+				},
+				{
+					"name": "Scan Projects",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-Ignition-API-Token",
+								"value": "{{api_key}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{gateway_url}}/data/api/v1/scan/projects",
+							"host": [
+								"{{gateway_url}}"
+							],
+							"path": [
+								"data",
+								"api",
+								"v1",
+								"scan",
+								"projects"
+							]
+						},
+						"description": "Trigger a projects scan to detect new or updated projects"
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

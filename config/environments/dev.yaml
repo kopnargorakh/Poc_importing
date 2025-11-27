@@ -6,7 +6,7 @@ gateway:
   url: http://localhost:8088
   username: admin
   password: dev-password
-  api_key: cicd:cicd:sMwrq8GV0e16T6yzpY9_5iejY6wO_6ddHY__RKb-ksM
+  api_key: cicd:sMwrq8GV0e16T6yzpY9_5iejY6wO_6ddHY__RKb-ksM
   container_name: ignition-dev
   backup_path: ./backups/dev
 database:

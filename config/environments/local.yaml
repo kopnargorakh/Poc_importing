@@ -6,7 +6,7 @@ gateway:
   url: http://localhost:9088
   username: admin
   password: Test123!
-  api_key: cicd:cicd:sMwrq8GV0e16T6yzpY9_5iejY6wO_6ddHY__RKb-ksM
+  api_key: cicd:sMwrq8GV0e16T6yzpY9_5iejY6wO_6ddHY__RKb-ksM
   container_name: ignition-local
   backup_path: ./backups/local
 database:
