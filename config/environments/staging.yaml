@@ -1,6 +1,7 @@
 ---
 # Staging Environment Configuration
 environment: staging
+deploy_root: /Users/jasperlouage/_docker/ignition-83-cicd-mustry
 gateway:
   url: http://localhost:8188
   username: admin

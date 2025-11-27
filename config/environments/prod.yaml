@@ -1,6 +1,7 @@
 ---
 # Production Environment Configuration
 environment: prod
+deploy_root: /Users/jasperlouage/_docker/ignition-83-cicd-mustry
 gateway:
   url: http://localhost:8288
   username: admin
