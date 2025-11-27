@@ -1,5 +1,5 @@
 
-def getNumber():
-	test = 11
+def getProductionOrderNumber():
+	test = 'PO-12345'
 	return test
 	

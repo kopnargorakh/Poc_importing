@@ -10,9 +10,9 @@
         },
         "position": {
           "height": 32,
-          "width": 50,
-          "x": 70,
-          "y": 87
+          "width": 119,
+          "x": 138,
+          "y": 106
         },
         "propConfig": {
           "props.text": {
@@ -22,13 +22,28 @@
               },
               "transforms": [
                 {
-                  "code": "\treturn application.productionOrderService.getNumber()",
+                  "code": "\treturn application.productionOrderService.getProductionOrderNumber()",
                   "type": "script"
                 }
               ],
               "type": "expr"
             }
           }
+        },
+        "type": "ia.display.label"
+      },
+      {
+        "meta": {
+          "name": "Label_0"
+        },
+        "position": {
+          "height": 32,
+          "width": 119,
+          "x": 138,
+          "y": 149
+        },
+        "props": {
+          "text": 12
         },
         "type": "ia.display.label"
       }

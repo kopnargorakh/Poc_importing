@@ -145,6 +145,26 @@ echo ""
 # Step 5: Deploy projects
 echo "Step 5: Deploying Ignition projects..."
 BUILD_DIR="$PROJECT_ROOT/build"
+PROJECTS_DIR="$PROJECT_ROOT/projects"
+
+# Package projects from source if projects/ exists (local development scenario)
+# CI/CD packages separately before calling deploy.sh, but locally we do it here
+# Always repackage to ensure latest changes are deployed
+if [ -d "$PROJECTS_DIR" ] && [ -n "$(ls -A "$PROJECTS_DIR" 2>/dev/null)" ]; then
+  echo "  Packaging projects from source..."
+  rm -rf "$BUILD_DIR"
+  mkdir -p "$BUILD_DIR"
+
+  for dir in "$PROJECTS_DIR"/*/; do
+    if [ -d "$dir" ]; then
+      project_name=$(basename "$dir")
+      echo "  Packaging $project_name..."
+      "$SCRIPT_DIR/package-project.sh" "$dir"
+    fi
+  done
+  echo ""
+fi
+
 if [ -d "$BUILD_DIR" ]; then
   # Check for no-projects marker
   if [ -f "$BUILD_DIR/.no-projects" ]; then
