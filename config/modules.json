@@ -1,6 +1,6 @@
 {
   "com.cirruslink.mqtt.distributor.gateway": {
-    "filename": "/usr/local/bin/ignition/data/var/ignition/modl/MQTT-Distributor-signed (1).modl",
+    "filename": "/usr/local/bin/ignition/user-lib/modules/MQTT-Distributor-signed.modl",
     "onStartup": "enabled",
     "certFingerprint": "b3d50508d45e1703dea19b80f6cdc3d7030c1f03",
     "licenseAgreementHash": 2517188037

@@ -21,11 +21,13 @@ services:
       - ./projects:/usr/local/bin/ignition/data/projects
       # Version-controlled config - changes here go directly to git
       - ./config/gateway:/usr/local/bin/ignition/data/config
+      # Persist internal database state to avoid repeated commissioning
+      - ./ignition-data/local/db:/usr/local/bin/ignition/data/db
+      # Secrets management
+      - ./secrets/gateway_admin_password.txt:/run/secrets/gateway_admin_password:ro
       # Module state configuration (with cert fingerprints for third-party modules)
       - ./config/modules.json:/usr/local/bin/ignition/data/modules.json
       - ./backups/local:/backups
-      # Secrets management
-      - ./secrets/gateway_admin_password.txt:/run/secrets/gateway_admin_password:ro
       # Third-party modules (individual file mounts to preserve built-in modules)
       - ./third-party-modules/Embr-Charts-Ignition83-4.0.1.modl:/usr/local/bin/ignition/user-lib/modules/Embr-Charts-Ignition83-4.0.1.modl:ro
       - ./third-party-modules/MQTT-Distributor-signed.modl:/usr/local/bin/ignition/user-lib/modules/MQTT-Distributor-signed.modl:ro
@@ -92,11 +94,13 @@ services:
       # CI/CD deployment targets - managed by automation
       - ./services/ignition-dev/config:/usr/local/bin/ignition/data/config
       - ./services/ignition-dev/projects:/usr/local/bin/ignition/data/projects
+      # Persist internal database state to avoid repeated commissioning
+      - ./services/ignition-dev/db:/usr/local/bin/ignition/data/db
+      # Secrets management
+      - ./secrets/gateway_admin_password.txt:/run/secrets/gateway_admin_password:ro
       # Module state configuration (with cert fingerprints for third-party modules)
       - ./config/modules.json:/usr/local/bin/ignition/data/modules.json
       - ./backups/dev:/backups
-      # Secrets management
-      - ./secrets/gateway_admin_password.txt:/run/secrets/gateway_admin_password:ro
       # Third-party modules (individual file mounts to preserve built-in modules)
       - ./third-party-modules/Embr-Charts-Ignition83-4.0.1.modl:/usr/local/bin/ignition/user-lib/modules/Embr-Charts-Ignition83-4.0.1.modl:ro
       - ./third-party-modules/MQTT-Distributor-signed.modl:/usr/local/bin/ignition/user-lib/modules/MQTT-Distributor-signed.modl:ro
@@ -163,11 +167,13 @@ services:
       # Curated configuration mounts (additive approach)
       - ./services/ignition-staging/config:/usr/local/bin/ignition/data/config
       - ./services/ignition-staging/projects:/usr/local/bin/ignition/data/projects
+      # Persist internal database state to avoid repeated commissioning
+      - ./services/ignition-staging/db:/usr/local/bin/ignition/data/db
+      # Secrets management
+      - ./secrets/gateway_admin_password.txt:/run/secrets/gateway_admin_password:ro
       # Module state configuration (with cert fingerprints for third-party modules)
       - ./config/modules.json:/usr/local/bin/ignition/data/modules.json
       - ./backups/staging:/backups
-      # Secrets management
-      - ./secrets/gateway_admin_password.txt:/run/secrets/gateway_admin_password:ro
       # Third-party modules (individual file mounts to preserve built-in modules)
       - ./third-party-modules/Embr-Charts-Ignition83-4.0.1.modl:/usr/local/bin/ignition/user-lib/modules/Embr-Charts-Ignition83-4.0.1.modl:ro
       - ./third-party-modules/MQTT-Distributor-signed.modl:/usr/local/bin/ignition/user-lib/modules/MQTT-Distributor-signed.modl:ro
@@ -234,11 +240,13 @@ services:
       # Curated configuration mounts (additive approach)
       - ./services/ignition-prod/config:/usr/local/bin/ignition/data/config
       - ./services/ignition-prod/projects:/usr/local/bin/ignition/data/projects
+      # Persist internal database state to avoid repeated commissioning
+      - ./services/ignition-prod/db:/usr/local/bin/ignition/data/db
+      # Secrets management
+      - ./secrets/gateway_admin_password.txt:/run/secrets/gateway_admin_password:ro
       # Module state configuration (with cert fingerprints for third-party modules)
       - ./config/modules.json:/usr/local/bin/ignition/data/modules.json
       - ./backups/prod:/backups
-      # Secrets management
-      - ./secrets/gateway_admin_password.txt:/run/secrets/gateway_admin_password:ro
       # Third-party modules (individual file mounts to preserve built-in modules)
       - ./third-party-modules/Embr-Charts-Ignition83-4.0.1.modl:/usr/local/bin/ignition/user-lib/modules/Embr-Charts-Ignition83-4.0.1.modl:ro
       - ./third-party-modules/MQTT-Distributor-signed.modl:/usr/local/bin/ignition/user-lib/modules/MQTT-Distributor-signed.modl:ro

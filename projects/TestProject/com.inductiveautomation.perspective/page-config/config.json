@@ -2,7 +2,7 @@
   "pages": {
     "/": {
       "title": "",
-      "viewPath": "Home"
+      "viewPath": "OEEOverview"
     }
   },
   "sharedDocks": {
