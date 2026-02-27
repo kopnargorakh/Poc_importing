@@ -176,6 +176,8 @@ if [ -d "$CONFIG_SOURCE" ]; then
       sleep 2  # Give Ignition time to process
     else
       echo "  ✗ Config scan failed (HTTP $SCAN_HTTP_CODE)"
+      echo "Error: Aborting deployment due to config scan failure."
+      exit 1
     fi
   else
     echo "  ⚠ No API key configured, skipping config scan"
