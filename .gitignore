@@ -14,8 +14,8 @@ backups/*/*
 
 # Ignition Local Configuration (per curated mounts approach)
 # See: https://docs.inductiveautomation.com/docs/8.3/tutorials/version-control-guide
-**/config/local
-**/config/resources/local
+**/config/gateway/local
+**/config/gateway/resources/local
 **/conversion-report.txt
 **/.resources/
 
@@ -26,7 +26,7 @@ config/gateway/resources/migration-log-*.md
 
 # Version-Controlled Gateway Configuration
 # config/gateway/ - Source of truth for gateway config (version controlled)
-# Note: Runtime-specific paths are excluded below via **/config/local patterns
+# Note: Runtime-specific paths are excluded below via **/config/gateway/local patterns
 
 # Environment-specific deployments (not version controlled)
 # - ignition-local: Local development workspace (config can diverge from version control)
