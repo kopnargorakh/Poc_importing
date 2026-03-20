@@ -1,0 +1,19 @@
+{
+  "scope": "A",
+  "description": "",
+  "version": 1,
+  "restricted": false,
+  "overridable": true,
+  "files": [
+    "config.json"
+  ],
+  "attributes": {
+    "lastModification": {
+      "actor": "admin",
+      "timestamp": "2026-03-20T13:02:43Z"
+    },
+    "uuid": "9b690b8a-9174-4739-b492-b3bb7daf550d",
+    "lastModificationSignature": "0275c089afb6acab8ae4620bc2adc61061f68b345dcde3db97b3ac9b6c9af356",
+    "enabled": true
+  }
+}

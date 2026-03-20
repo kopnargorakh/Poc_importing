@@ -40,7 +40,7 @@ services:
       - GATEWAY_ADMIN_USERNAME=admin
       - GATEWAY_ADMIN_PASSWORD=${GATEWAY_ADMIN_PASSWORD:-Test123!}
       - IGNITION_EDITION=standard
-      - GATEWAY_MODULES_ENABLED=com.inductiveautomation.eventstream, alarm-notification,reporting,opc-ua,perspective,sms-notification,symbol-factory,tag-historian,udp-tcp-drivers,web-developer,com.mussonindustrial.embr.charts,com.cirruslink.mqtt.distributor.gateway,com.cirruslink.mqtt.engine.gateway,com.cirruslink.mqtt.transmission.gateway
+      - GATEWAY_MODULES_ENABLED=com.inductiveautomation.eventstream, alarm-notification,reporting,opc-ua,perspective,sms-notification,symbol-factory,tag-historian,udp-tcp-drivers,web-developer,com.mussonindustrial.embr.charts,com.cirruslink.mqtt.distributor.gateway,com.cirruslink.mqtt.engine.gateway,com.cirruslink.mqtt.transmission.gateway, com.inductiveautomation.jdbc.postgresql, com.inductiveautomation.jdbc.mssql, com.inductiveautomation.jdbc.mariadb, com.inductiveautomation.connectors.kafka, com.inductiveautomation.suite.enterprise
       - IGNITION_UID=1000
       - IGNITION_GID=1000
       - TZ=Europe/Brussels
@@ -113,7 +113,7 @@ services:
       - GATEWAY_ADMIN_USERNAME=admin
       - GATEWAY_ADMIN_PASSWORD_FILE=/run/secrets/gateway_admin_password
       - IGNITION_EDITION=standard
-      - GATEWAY_MODULES_ENABLED=com.inductiveautomation.jdbc.postgresql,alarm-notification,reporting,opc-ua,perspective,sms-notification,symbol-factory,tag-historian,udp-tcp-drivers,web-developer,com.mussonindustrial.embr.charts,com.cirruslink.mqtt.distributor.gateway,com.cirruslink.mqtt.engine.gateway,com.cirruslink.mqtt.transmission.gateway
+      - GATEWAY_MODULES_ENABLED=com.inductiveautomation.eventstream, alarm-notification,reporting,opc-ua,perspective,sms-notification,symbol-factory,tag-historian,udp-tcp-drivers,web-developer,com.mussonindustrial.embr.charts,com.cirruslink.mqtt.distributor.gateway,com.cirruslink.mqtt.engine.gateway,com.cirruslink.mqtt.transmission.gateway, com.inductiveautomation.jdbc.postgresql, com.inductiveautomation.jdbc.mssql, com.inductiveautomation.jdbc.mariadb, com.inductiveautomation.connectors.kafka, com.inductiveautomation.suite.enterprise
       - IGNITION_UID=1000
       - IGNITION_GID=1000
       - TZ=Europe/Brussels
@@ -186,7 +186,7 @@ services:
       - GATEWAY_ADMIN_USERNAME=admin
       - GATEWAY_ADMIN_PASSWORD_FILE=/run/secrets/gateway_admin_password
       - IGNITION_EDITION=standard
-      - GATEWAY_MODULES_ENABLED=alarm-notification,reporting,opc-ua,perspective,sms-notification,symbol-factory,tag-historian,udp-tcp-drivers,web-developer,com.mussonindustrial.embr.charts,com.cirruslink.mqtt.distributor.gateway,com.cirruslink.mqtt.engine.gateway,com.cirruslink.mqtt.transmission.gateway
+      - GATEWAY_MODULES_ENABLED=com.inductiveautomation.eventstream, alarm-notification,reporting,opc-ua,perspective,sms-notification,symbol-factory,tag-historian,udp-tcp-drivers,web-developer,com.mussonindustrial.embr.charts,com.cirruslink.mqtt.distributor.gateway,com.cirruslink.mqtt.engine.gateway,com.cirruslink.mqtt.transmission.gateway, com.inductiveautomation.jdbc.postgresql, com.inductiveautomation.jdbc.mssql, com.inductiveautomation.jdbc.mariadb, com.inductiveautomation.connectors.kafka, com.inductiveautomation.suite.enterprise
       - IGNITION_UID=1000
       - IGNITION_GID=1000
       - TZ=Europe/Brussels
@@ -259,7 +259,7 @@ services:
       - GATEWAY_ADMIN_USERNAME=admin
       - GATEWAY_ADMIN_PASSWORD_FILE=/run/secrets/gateway_admin_password
       - IGNITION_EDITION=standard
-      - GATEWAY_MODULES_ENABLED=alarm-notification,reporting,opc-ua,perspective,sms-notification,symbol-factory,tag-historian,udp-tcp-drivers,web-developer,com.mussonindustrial.embr.charts,com.cirruslink.mqtt.distributor.gateway,com.cirruslink.mqtt.engine.gateway,com.cirruslink.mqtt.transmission.gateway
+      - GATEWAY_MODULES_ENABLED=com.inductiveautomation.eventstream, alarm-notification,reporting,opc-ua,perspective,sms-notification,symbol-factory,tag-historian,udp-tcp-drivers,web-developer,com.mussonindustrial.embr.charts,com.cirruslink.mqtt.distributor.gateway,com.cirruslink.mqtt.engine.gateway,com.cirruslink.mqtt.transmission.gateway, com.inductiveautomation.jdbc.postgresql, com.inductiveautomation.jdbc.mssql, com.inductiveautomation.jdbc.mariadb, com.inductiveautomation.connectors.kafka, com.inductiveautomation.suite.enterprise
       - IGNITION_UID=1000
       - IGNITION_GID=1000
       - TZ=Europe/Brussels
