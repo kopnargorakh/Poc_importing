@@ -1,7 +1,7 @@
 ---
 # Development Environment Configuration
 environment: dev
-deploy_root: /Users/jasperlouage/_docker/ignition-83-cicd-mustry
+deploy_root: C:/Program Files/Inductive Automation/Ignition/data
 gateway:
   url: http://localhost:8088
   username: admin
