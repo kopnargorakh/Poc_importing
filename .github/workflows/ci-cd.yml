@@ -50,7 +50,7 @@ jobs:
           echo "Packaging all Ignition projects..."
 
           # Clean build directory to remove old artifacts
-          rm -rf build/
+          
           mkdir -p build/
 
           if [ ! -d "projects" ] || [ -z "$(ls -A projects 2>/dev/null)" ]; then
