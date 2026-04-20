@@ -107,7 +107,8 @@ jobs:
 
       - name: Deploy to Development Gateway
         shell: cmd
-        run: "C:\Program Files\Git\bin\bash.exe" ./scripts/deploy-project.sh dev projects/TestProject
+        run: |
+          "C:\Program Files\Git\bin\bash.exe" ./scripts/deploy-project.sh dev projects/TestProject
         env:
           DEV_GATEWAY_URL: ${{ secrets.DEV_GATEWAY_URL }}
           DEV_GATEWAY_API_KEY: ${{ secrets.DEV_GATEWAY_API_KEY }}
