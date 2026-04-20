@@ -1,5 +1,5 @@
 # GitHub Actions CI/CD Pipeline for Ignition 8.3
-# GitFlow-based deployment strategy
+# Development only deployment
 
 name: CI/CD Pipeline
 
@@ -14,15 +14,9 @@ on:
   push:
     branches:
       - develop
-      - release/**
-      - main
-    tags:
-      - v*
   pull_request:
     branches:
       - develop
-      - release/**
-      - main
 
 env:
   BUILD_CONFIGURATION: Release
@@ -31,16 +25,11 @@ jobs:
   check-branch-policy:
     name: Check Branch Policy
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    if: github.event_name == 'pull_request' && github.base_ref == 'develop'
     steps:
-      - name: Ensure PR to main is from release branch
+      - name: Ensure PR to develop is valid
         run: |
-          if [[ ! "${{ github.head_ref }}" =~ ^release/ ]]; then
-            echo "❌ Error: Pull requests to main must come from release/* branches"
-            echo "Current source branch: ${{ github.head_ref }}"
-            exit 1
-          fi
-          echo "✅ Branch policy check passed: ${{ github.head_ref }} → main"
+          echo "✅ Branch policy check passed: ${{ github.head_ref }} → develop"
 
   build:
     name: Build and Validate
@@ -130,140 +119,14 @@ jobs:
           name: build-artifacts-${{ github.sha }}
           path: .
 
-      - name: Initialize Database
-        run: |
-          set -e
-          echo "Ensuring development database exists..."
-          docker exec ignition-postgres psql -U ignition -d postgres -c "CREATE DATABASE ignition_dev;" 2>/dev/null || echo "Database ignition_dev already exists"
-
       - name: Deploy to Development Gateway
         run: |
           set -e
           chmod +x ./scripts/*.sh
           echo "Deploying to Development environment..."
-          ./scripts/deploy.sh dev
+          ./scripts/deploy-project.sh dev projects/TestProject
         env:
           DEV_GATEWAY_URL: ${{ secrets.DEV_GATEWAY_URL }}
           DEV_GATEWAY_USER: ${{ secrets.DEV_GATEWAY_USER }}
           DEV_GATEWAY_PASS: ${{ secrets.DEV_GATEWAY_PASS }}
           DEV_GATEWAY_API_KEY: ${{ secrets.DEV_GATEWAY_API_KEY }}
-          DEV_DB_URL: ${{ secrets.DEV_DB_URL }}
-
-  deploy-staging:
-    name: Deploy to Staging
-    runs-on: self-hosted
-    needs: [build, test-pylib]
-    if: startsWith(github.ref, 'refs/heads/release/')
-    environment:
-      name: staging
-
-    steps:
-      - name: Clean Previous Build Artifacts
-        run: |
-          echo "Cleaning previous build artifacts..."
-          rm -rf build/
-          mkdir -p build/
-
-      - name: Download Build Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-artifacts-${{ github.sha }}
-          path: .
-
-      - name: Initialize Database
-        run: |
-          set -e
-          echo "Ensuring staging database exists..."
-          docker exec ignition-postgres psql -U ignition -d postgres -c "CREATE DATABASE ignition_staging;" 2>/dev/null || echo "Database ignition_staging already exists"
-
-      - name: Run Database Migration
-        run: |
-          set -e
-          chmod +x ./scripts/*.sh
-          echo "Running database migrations for staging..."
-          ./scripts/db-migrate.sh staging up
-        env:
-          STAGING_DB_URL: ${{ secrets.STAGING_DB_URL }}
-
-      - name: Deploy to Staging Gateway
-        run: |
-          set -e
-          chmod +x ./scripts/*.sh
-          echo "Deploying to Staging environment..."
-          ./scripts/deploy.sh staging
-        env:
-          STAGING_GATEWAY_URL: ${{ secrets.STAGING_GATEWAY_URL }}
-          STAGING_GATEWAY_USER: ${{ secrets.STAGING_GATEWAY_USER }}
-          STAGING_GATEWAY_PASS: ${{ secrets.STAGING_GATEWAY_PASS }}
-          STAGING_GATEWAY_API_KEY: ${{ secrets.STAGING_GATEWAY_API_KEY }}
-          STAGING_DB_URL: ${{ secrets.STAGING_DB_URL }}
-
-  deploy-prod:
-    name: Deploy to Production
-    runs-on: self-hosted
-    needs: [build, test-pylib]
-    if: startsWith(github.ref, 'refs/tags/v')
-    environment:
-      name: production
-
-    steps:
-      - name: Clean Previous Build Artifacts
-        run: |
-          echo "Cleaning previous build artifacts..."
-          rm -rf build/
-          mkdir -p build/
-
-      - name: Download Build Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-artifacts-${{ github.sha }}
-          path: .
-
-      - name: Backup Production Gateway
-        run: |
-          set -e
-          chmod +x ./scripts/*.sh
-          echo "Creating backup of production gateway..."
-          ./scripts/backup-gateway.sh prod
-        env:
-          PROD_GATEWAY_URL: ${{ secrets.PROD_GATEWAY_URL }}
-          PROD_GATEWAY_USER: ${{ secrets.PROD_GATEWAY_USER }}
-          PROD_GATEWAY_PASS: ${{ secrets.PROD_GATEWAY_PASS }}
-          PROD_GATEWAY_API_KEY: ${{ secrets.PROD_GATEWAY_API_KEY }}
-
-      - name: Initialize Database
-        run: |
-          set -e
-          echo "Ensuring production database exists..."
-          docker exec ignition-postgres psql -U ignition -d postgres -c "CREATE DATABASE ignition_prod;" 2>/dev/null || echo "Database ignition_prod already exists"
-
-      - name: Run Database Migration
-        run: |
-          set -e
-          chmod +x ./scripts/*.sh
-          echo "Running database migrations for production..."
-          ./scripts/db-migrate.sh prod up
-        env:
-          PROD_DB_URL: ${{ secrets.PROD_DB_URL }}
-
-      - name: Deploy to Production Gateway
-        run: |
-          set -e
-          chmod +x ./scripts/*.sh
-          echo "Deploying to Production environment..."
-          ./scripts/deploy.sh prod
-        env:
-          PROD_GATEWAY_URL: ${{ secrets.PROD_GATEWAY_URL }}
-          PROD_GATEWAY_API_KEY: ${{ secrets.PROD_GATEWAY_API_KEY }}
-          PROD_GATEWAY_USER: ${{ secrets.PROD_GATEWAY_USER }}
-          PROD_GATEWAY_PASS: ${{ secrets.PROD_GATEWAY_PASS }}
-          PROD_DB_URL: ${{ secrets.PROD_DB_URL }}
-
-      - name: Run Production Smoke Tests
-        run: |
-          set -e
-          chmod +x ./scripts/*.sh
-          echo "Running smoke tests on production..."
-          ./scripts/smoke-test.sh prod
-        env:
-          PROD_GATEWAY_URL: ${{ secrets.PROD_GATEWAY_URL }}
