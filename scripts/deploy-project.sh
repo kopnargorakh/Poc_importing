@@ -93,13 +93,37 @@ if ! curl -s -f "${GATEWAY_URL}/StatusPing" > /dev/null 2>&1; then
 fi
 echo "Gateway is healthy"
 
-# Tags seedha file system mein copy karo
+# Tags aur unary-resource deploy karo
 TAGS_SOURCE="$DEPLOY_DIR/ignition/tags/tags.json"
+RESOURCE_SOURCE="$DEPLOY_DIR/ignition/tags/unary-resource.json"
+
 if [ -f "$TAGS_SOURCE" ] && [ -n "$TAGS_ROOT" ]; then
   echo "Deploying tags to file system..."
   mkdir -p "$TAGS_ROOT"
+
+  # tags.json copy karo
   cp "$TAGS_SOURCE" "$TAGS_ROOT/tags.json"
   echo "  Tags copied successfully!"
+
+  # unary-resource.json copy karo ya banao
+  if [ -f "$RESOURCE_SOURCE" ]; then
+    cp "$RESOURCE_SOURCE" "$TAGS_ROOT/unary-resource.json"
+    echo "  unary-resource.json copied!"
+  else
+    cat > "$TAGS_ROOT/unary-resource.json" << 'EOF'
+{
+  "scope": "G",
+  "version": 1,
+  "restricted": false,
+  "overridable": true,
+  "files": ["tags.json"],
+  "attributes": {
+    "config": {}
+  }
+}
+EOF
+    echo "  unary-resource.json created!"
+  fi
 else
   echo "  No tags file or tags_root not configured — skipping"
 fi
