@@ -1,0 +1,30 @@
+{
+  "tagType": "Folder",
+  "name": "",
+  "tags": [
+    {
+      "tagType": "AtomicTag",
+      "name": "Temperature",
+      "dataType": "Float4",
+      "value": 0.0,
+      "accessRights": "Read_Write",
+      "enabled": true
+    },
+    {
+      "tagType": "AtomicTag", 
+      "name": "Pressure",
+      "dataType": "Float4",
+      "value": 0.0,
+      "accessRights": "Read_Write",
+      "enabled": true
+    },
+    {
+      "tagType": "AtomicTag",
+      "name": "Speed",
+      "dataType": "Float4", 
+      "value": 0.0,
+      "accessRights": "Read_Write",
+      "enabled": true
+    }
+  ]
+}
