@@ -38,8 +38,10 @@ GATEWAY_URL_FROM_CONFIG=$(grep "url:" "$CONFIG_FILE" | head -1 | awk '{print $2}
 
 GATEWAY_URL_ENV_VAR="${ENV_VAR_PREFIX}_GATEWAY_URL"
 GATEWAY_API_KEY_ENV_VAR="${ENV_VAR_PREFIX}_GATEWAY_API_KEY"
+GATEWAY_PASS_ENV_VAR="${ENV_VAR_PREFIX}_GATEWAY_PASS"
 GATEWAY_URL="$(eval echo \$${GATEWAY_URL_ENV_VAR})"
 API_KEY="$(eval echo \$${GATEWAY_API_KEY_ENV_VAR})"
+GATEWAY_PASS="$(eval echo \$${GATEWAY_PASS_ENV_VAR})"
 
 if [ -z "$GATEWAY_URL" ]; then GATEWAY_URL="$GATEWAY_URL_FROM_CONFIG"; fi
 
@@ -101,11 +103,9 @@ if [ -f "$TAGS_SOURCE" ] && [ -n "$TAGS_ROOT" ]; then
   echo "Deploying tags to file system..."
   mkdir -p "$TAGS_ROOT"
 
-  # tags.json copy karo
   cp "$TAGS_SOURCE" "$TAGS_ROOT/tags.json"
   echo "  Tags copied successfully!"
 
-  # unary-resource.json copy karo ya banao
   if [ -f "$RESOURCE_SOURCE" ]; then
     cp "$RESOURCE_SOURCE" "$TAGS_ROOT/unary-resource.json"
     echo "  unary-resource.json copied!"
@@ -126,6 +126,20 @@ EOF
   fi
 else
   echo "  No tags file or tags_root not configured — skipping"
+fi
+
+# Automatic tag reload — restart ki zaroorat nahi!
+echo "Reloading tags automatically..."
+RELOAD_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+  -X POST \
+  -u "admin:$GATEWAY_PASS" \
+  "${GATEWAY_URL}/data/tag/reload?provider=default")
+echo "  Tag reload: HTTP $RELOAD_CODE"
+
+if [ "$RELOAD_CODE" = "200" ]; then
+  echo "  Tags reloaded successfully — no restart needed!"
+else
+  echo "  Auto reload HTTP $RELOAD_CODE — tags will load on next restart"
 fi
 
 echo ""
