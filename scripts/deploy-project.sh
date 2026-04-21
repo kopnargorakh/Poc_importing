@@ -93,6 +93,25 @@ if ! curl -s -f "${GATEWAY_URL}/StatusPing" > /dev/null 2>&1; then
 fi
 echo "Gateway is healthy"
 
+# Tags deploy karo
+TAGS_FILE="$DEPLOY_DIR/ignition/tags/tags.json"
+if [ -f "$TAGS_FILE" ]; then
+  echo "Deploying tags..."
+  TAGS_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+    -H "X-Ignition-API-Token: $API_KEY" \
+    -H "Content-Type: application/json" \
+    -X POST "${GATEWAY_URL}/data/tag/importtags?provider=default&collisionPolicy=o" \
+    --data-binary "@$TAGS_FILE")
+  if [ "$TAGS_HTTP_CODE" = "200" ]; then
+    echo "  Tags deployed successfully"
+  else
+    echo "  Tags deploy failed (HTTP $TAGS_HTTP_CODE) — continuing anyway"
+  fi
+else
+  echo "  No tags file found — skipping"
+fi
+
+# Scans trigger karo
 if [ -n "$API_KEY" ]; then
   curl -s -o /dev/null -w "Config scan: %{http_code}\n" \
     -H "X-Ignition-API-Token: $API_KEY" \
