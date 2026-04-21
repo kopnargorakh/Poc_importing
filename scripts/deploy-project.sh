@@ -55,8 +55,8 @@ if [ ! -f "$CONFIG_FILE" ]; then
   exit 1
 fi
 
-# Parse configuration
-DEPLOY_ROOT=$(grep "^deploy_root:" "$CONFIG_FILE" | awk '{print $2}' | tr -d '"')
+# Parse configuration — sed use karo taaki spaces sahi se handle hon
+DEPLOY_ROOT=$(grep "^deploy_root:" "$CONFIG_FILE" | sed 's/^deploy_root:[[:space:]]*//' | tr -d '"')
 GATEWAY_URL_FROM_CONFIG=$(grep "url:" "$CONFIG_FILE" | head -1 | awk '{print $2}')
 API_KEY_FROM_CONFIG=$(grep "api_key:" "$CONFIG_FILE" | head -1 | awk '{print $2}')
 
@@ -74,105 +74,4 @@ fi
 
 # Use deploy_root if specified, otherwise use PROJECT_ROOT
 if [ -n "$DEPLOY_ROOT" ]; then
-  DEPLOY_TARGET="$DEPLOY_ROOT"
-else
-  DEPLOY_TARGET="$PROJECT_ROOT"
-fi
-
-# Determine project name and prepare source
-if [ "$IS_ZIP" = true ]; then
-  TEMP_DIR=$(mktemp -d)
-  unzip -q "$PROJECT_SOURCE" -d "$TEMP_DIR"
-  SOURCE_DIR="$TEMP_DIR"
-  ZIP_BASENAME=$(basename "$PROJECT_SOURCE" .zip)
-  PROJECT_NAME=$(echo "$ZIP_BASENAME" | sed -E 's/-+[v]?[0-9]+\.[0-9]+\.[0-9]+(-[a-f0-9]+)?$//' | sed -E 's/-+[a-f0-9]{7,}$//')
-  if [ -z "$PROJECT_NAME" ] || [ "$PROJECT_NAME" = "$ZIP_BASENAME" ]; then
-    PROJECT_NAME="$ZIP_BASENAME"
-  fi
-else
-  PROJECT_NAME=$(basename "$PROJECT_SOURCE")
-  SOURCE_DIR="$PROJECT_SOURCE"
-fi
-
-echo "=========================================="
-echo "Deploying Project: $PROJECT_NAME"
-echo "Environment: $ENVIRONMENT"
-echo "=========================================="
-
-# Deploy directory — directly inside deploy_root
-DEPLOY_DIR="$DEPLOY_TARGET/$PROJECT_NAME"
-
-echo "Deploying to: $DEPLOY_DIR"
-
-# Create directory if it doesn't exist
-mkdir -p "$(dirname "$DEPLOY_DIR")"
-
-# Remove existing project if it exists
-if [ -d "$DEPLOY_DIR" ]; then
-  echo "Removing existing project..."
-  rm -rf "$DEPLOY_DIR"
-fi
-
-# Copy project files
-echo "Copying project files..."
-cp -r "$SOURCE_DIR" "$DEPLOY_DIR"
-
-# Clean up temp directory if we extracted a zip
-if [ "$IS_ZIP" = true ]; then
-  rm -rf "$TEMP_DIR"
-fi
-
-# Function to trigger Ignition scans
-trigger_ignition_scans() {
-  echo "Triggering Ignition resource scans..."
-
-  if [ -z "$API_KEY" ]; then
-    echo "  No API key configured, skipping resource scans"
-    echo "  Gateway will auto-detect changes"
-    return 0
-  fi
-
-  # Trigger config scan
-  echo "  - Scanning gateway configuration..."
-  CONFIG_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-    -H "X-Ignition-API-Token: $API_KEY" \
-    -X POST "${GATEWAY_URL}/data/api/v1/scan/config")
-  if [ "$CONFIG_HTTP_CODE" = "200" ]; then
-    echo "    ✓ Config scan triggered"
-  else
-    echo "    ✗ Config scan failed (HTTP $CONFIG_HTTP_CODE) — continuing anyway"
-  fi
-
-  # Trigger projects scan
-  echo "  - Scanning projects..."
-  PROJECTS_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-    -H "X-Ignition-API-Token: $API_KEY" \
-    -X POST "${GATEWAY_URL}/data/api/v1/scan/projects")
-  if [ "$PROJECTS_HTTP_CODE" = "200" ]; then
-    echo "    ✓ Projects scan triggered"
-  else
-    echo "    ✗ Projects scan failed (HTTP $PROJECTS_HTTP_CODE) — continuing anyway"
-  fi
-}
-
-# Verify gateway is running
-echo "Verifying gateway health..."
-if ! curl -s -f "${GATEWAY_URL}/StatusPing" > /dev/null 2>&1; then
-  echo ""
-  echo "✗ Gateway is not responding at ${GATEWAY_URL}"
-  echo "  Please ensure Ignition is running"
-  echo ""
-  exit 1
-fi
-echo "✓ Gateway is healthy"
-
-# Trigger scans — failures won't abort deployment now
-trigger_ignition_scans
-
-echo ""
-echo "✓ Project deployed successfully!"
-echo "  Project: $PROJECT_NAME"
-echo "  Environment: $ENVIRONMENT"
-echo "  Location: $DEPLOY_DIR"
-echo "  Gateway: ${GATEWAY_URL}/web/home"
-echo ""
+  D
