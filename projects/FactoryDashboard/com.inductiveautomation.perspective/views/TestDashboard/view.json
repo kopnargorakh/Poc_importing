@@ -1,0 +1,215 @@
+{
+  "custom": {},
+  "params": {},
+  "props": {
+    "defaultSize": {
+      "height": 600,
+      "width": 800
+    }
+  },
+  "root": {
+    "children": [
+      {
+        "meta": {
+          "name": "TemperatureLabel"
+        },
+        "position": {
+          "height": 32,
+          "width": 120,
+          "x": 50,
+          "y": 50
+        },
+        "props": {
+          "text": "Temperature:"
+        },
+        "type": "ia.display.label"
+      },
+      {
+        "meta": {
+          "name": "TemperatureValue"
+        },
+        "position": {
+          "height": 32,
+          "width": 100,
+          "x": 180,
+          "y": 50
+        },
+        "props": {
+          "value": {
+            "bind": "~tag:Temperature"
+          }
+        },
+        "type": "ia.display.numeric"
+      },
+      {
+        "meta": {
+          "name": "PressureLabel"
+        },
+        "position": {
+          "height": 32,
+          "width": 120,
+          "x": 50,
+          "y": 100
+        },
+        "props": {
+          "text": "Pressure:"
+        },
+        "type": "ia.display.label"
+      },
+      {
+        "meta": {
+          "name": "PressureValue"
+        },
+        "position": {
+          "height": 32,
+          "width": 100,
+          "x": 180,
+          "y": 100
+        },
+        "props": {
+          "value": {
+            "bind": "~tag:Pressure"
+          }
+        },
+        "type": "ia.display.numeric"
+      },
+      {
+        "meta": {
+          "name": "SpeedLabel"
+        },
+        "position": {
+          "height": 32,
+          "width": 120,
+          "x": 50,
+          "y": 150
+        },
+        "props": {
+          "text": "Speed:"
+        },
+        "type": "ia.display.label"
+      },
+      {
+        "meta": {
+          "name": "SpeedValue"
+        },
+        "position": {
+          "height": 32,
+          "width": 100,
+          "x": 180,
+          "y": 150
+        },
+        "props": {
+          "value": {
+            "bind": "~tag:Speed"
+          }
+        },
+        "type": "ia.display.numeric"
+      },
+      {
+        "meta": {
+          "name": "StatusLabel"
+        },
+        "position": {
+          "height": 32,
+          "width": 120,
+          "x": 50,
+          "y": 200
+        },
+        "props": {
+          "text": "Status:"
+        },
+        "type": "ia.display.label"
+      },
+      {
+        "meta": {
+          "name": "StatusValue"
+        },
+        "position": {
+          "height": 32,
+          "width": 100,
+          "x": 180,
+          "y": 200
+        },
+        "props": {
+          "value": {
+            "bind": "~tag:Status"
+          }
+        },
+        "type": "ia.display.boolean"
+      },
+      {
+        "meta": {
+          "name": "AlarmLabel"
+        },
+        "position": {
+          "height": 32,
+          "width": 120,
+          "x": 50,
+          "y": 250
+        },
+        "props": {
+          "text": "Alarm:"
+        },
+        "type": "ia.display.label"
+      },
+      {
+        "meta": {
+          "name": "AlarmValue"
+        },
+        "position": {
+          "height": 32,
+          "width": 100,
+          "x": 180,
+          "y": 250
+        },
+        "props": {
+          "value": {
+            "bind": "~tag:Alarm"
+          }
+        },
+        "type": "ia.display.boolean"
+      },
+      {
+        "meta": {
+          "name": "ProductionCountLabel"
+        },
+        "position": {
+          "height": 32,
+          "width": 120,
+          "x": 50,
+          "y": 300
+        },
+        "props": {
+          "text": "Production Count:"
+        },
+        "type": "ia.display.label"
+      },
+      {
+        "meta": {
+          "name": "ProductionCountValue"
+        },
+        "position": {
+          "height": 32,
+          "width": 100,
+          "x": 180,
+          "y": 300
+        },
+        "props": {
+          "value": {
+            "bind": "~tag:ProductionCount"
+          }
+        },
+        "type": "ia.display.numeric"
+      }
+    "meta": {
+      "name": "root"
+    },
+    "props": {
+      "direction": "column",
+      "style": {
+        "backgroundColor": "#f0f0f0"
+      }
+    },
+    "type": "ia.container.flex"
+  }
+}

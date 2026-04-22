@@ -3,6 +3,10 @@
     "/": {
       "title": "",
       "viewPath": "OEEOverview_v2"
+    },
+    "/test": {
+      "title": "Test Dashboard",
+      "viewPath": "TestDashboard"
     }
   },
   "sharedDocks": {

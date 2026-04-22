@@ -22,6 +22,27 @@
       "defaultValue": 50.0,
       "tagType": "AtomicTag",
       "dataType": "Float4"
+    },
+    {
+      "valueSource": "memory",
+      "name": "Status",
+      "defaultValue": true,
+      "tagType": "AtomicTag",
+      "dataType": "Boolean"
+    },
+    {
+      "valueSource": "memory",
+      "name": "Alarm",
+      "defaultValue": false,
+      "tagType": "AtomicTag",
+      "dataType": "Boolean"
+    },
+    {
+      "valueSource": "memory",
+      "name": "ProductionCount",
+      "defaultValue": 0,
+      "tagType": "AtomicTag",
+      "dataType": "Int4"
     }
   ]
 }
