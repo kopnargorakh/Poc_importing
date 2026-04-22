@@ -5,7 +5,7 @@
     {
       "valueSource": "memory",
       "name": "Temperature",
-      "defaultValue": 100.0,
+      "defaultValue": 101.0,
       "tagType": "AtomicTag",
       "dataType": "Float4"
     },
