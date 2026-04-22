@@ -1,0 +1,61 @@
+{
+  "enabled": true,
+  "source": {
+    "type": "ignition.tagEvent",
+    "config": {
+      "paths": [
+        "[default]"
+      ],
+      "changeTypes": [
+        "VALUE"
+      ],
+      "skipInitialValues": false
+    }
+  },
+  "sourceEncoder": {
+    "type": "ignition.jsonObject",
+    "properties": {
+      "encoding": "UTF-8"
+    }
+  },
+  "handlers": [
+    {
+      "enabled": true,
+      "type": "com.cirruslink.mqtt.transmission.gateway.mqtt.handler",
+      "config": {
+        "serverName": "Chariot SCADA",
+        "topic": "EventStreams/mqttStream",
+        "qos": 0,
+        "retained": false
+      },
+      "failureStrategy": {
+        "type": "ABORT",
+        "retryPolicy": null
+      }
+    }
+  ],
+  "batch": {
+    "debounceMs": 100,
+    "maxWaitMs": 1000,
+    "maxQueueSize": 0,
+    "overflow": "DROP_OLDEST"
+  },
+  "filter": {
+    "enabled": false,
+    "userCode": "\treturn True"
+  },
+  "transform": {
+    "enabled": false,
+    "userCode": "\treturn event.data"
+  },
+  "transformEncoder": {
+    "type": "ignition.jsonObject",
+    "properties": {
+      "encoding": "UTF-8"
+    }
+  },
+  "onError": {
+    "enabled": false,
+    "userCode": ""
+  }
+}
