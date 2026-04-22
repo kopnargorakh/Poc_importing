@@ -1,7 +1,7 @@
 {
   "scope": "A",
   "version": 1,
-  "restricted": false,
+  "restricted": true,
   "overridable": true,
   "files": [
     "data.bin"
