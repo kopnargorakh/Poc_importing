@@ -1,1 +1,17 @@
-{ "name": "TestDashboard", "type": "view", "version": "1.0.0", "properties": { "viewId": "TestDashboard", "description": "A sample dashboard for testing purposes.", "created": "2026-04-22T10:21:28Z", "lastUpdated": "2026-04-22T10:21:28Z" }, "content": { "components": [] } }
+{
+  "custom": {},
+  "params": {},
+  "props": {
+    "defaultSize": {
+      "height": 768,
+      "width": 1280
+    }
+  },
+  "root": {
+    "children": [],
+    "meta": {
+      "name": "root"
+    },
+    "type": "ia.container.flex"
+  }
+}
