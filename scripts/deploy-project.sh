@@ -1,15 +1,15 @@
 #!/bin/bash
-
+ 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 ENVIRONMENT_INPUT=$1
 PROJECT_SOURCE=$2
-
+ 
 if [ -z "$ENVIRONMENT_INPUT" ] || [ -z "$PROJECT_SOURCE" ]; then
   echo "Error: Missing required arguments"
   exit 1
 fi
-
+ 
 case "$ENVIRONMENT_INPUT" in
   local) ENVIRONMENT="local"; ENV_VAR_PREFIX="LOCAL" ;;
   dev|development) ENVIRONMENT="dev"; ENV_VAR_PREFIX="DEV" ;;
@@ -17,7 +17,7 @@ case "$ENVIRONMENT_INPUT" in
   prod|production) ENVIRONMENT="prod"; ENV_VAR_PREFIX="PROD" ;;
   *) echo "Error: Unknown environment: $ENVIRONMENT_INPUT"; exit 1 ;;
 esac
-
+ 
 IS_ZIP=false
 if [ -f "$PROJECT_SOURCE" ] && [[ "$PROJECT_SOURCE" == *.zip ]]; then
   IS_ZIP=true
@@ -25,35 +25,35 @@ elif [ ! -d "$PROJECT_SOURCE" ]; then
   echo "Error: Project source not found: $PROJECT_SOURCE"
   exit 1
 fi
-
+ 
 CONFIG_FILE="$PROJECT_ROOT/config/environments/${ENVIRONMENT}.yaml"
 if [ ! -f "$CONFIG_FILE" ]; then
   echo "Error: Config file not found: $CONFIG_FILE"
   exit 1
 fi
-
+ 
 DEPLOY_ROOT=$(grep "^deploy_root:" "$CONFIG_FILE" | sed 's/^deploy_root:[[:space:]]*//' | tr -d '"')
 TAGS_ROOT=$(grep "^tags_root:" "$CONFIG_FILE" | sed 's/^tags_root:[[:space:]]*//' | tr -d '"')
 GATEWAY_URL_FROM_CONFIG=$(grep "url:" "$CONFIG_FILE" | head -1 | awk '{print $2}')
-
+ 
 GATEWAY_URL_ENV_VAR="${ENV_VAR_PREFIX}_GATEWAY_URL"
 GATEWAY_API_KEY_ENV_VAR="${ENV_VAR_PREFIX}_GATEWAY_API_KEY"
 GATEWAY_PASS_ENV_VAR="${ENV_VAR_PREFIX}_GATEWAY_PASS"
 GATEWAY_URL="$(eval echo \$${GATEWAY_URL_ENV_VAR})"
 API_KEY="$(eval echo \$${GATEWAY_API_KEY_ENV_VAR})"
 GATEWAY_PASS="$(eval echo \$${GATEWAY_PASS_ENV_VAR})"
-
+ 
 if [ -z "$GATEWAY_URL" ]; then GATEWAY_URL="$GATEWAY_URL_FROM_CONFIG"; fi
-
+ 
 if [ -n "$DEPLOY_ROOT" ]; then
   DEPLOY_TARGET="$DEPLOY_ROOT"
 else
   DEPLOY_TARGET="$PROJECT_ROOT"
 fi
-
+ 
 echo "DEBUG: DEPLOY_TARGET=$DEPLOY_TARGET"
 echo "DEBUG: TAGS_ROOT=$TAGS_ROOT"
-
+ 
 if [ "$IS_ZIP" = true ]; then
   TEMP_DIR=$(mktemp -d)
   unzip -q "$PROJECT_SOURCE" -d "$TEMP_DIR"
@@ -67,45 +67,45 @@ else
   PROJECT_NAME=$(basename "$PROJECT_SOURCE")
   SOURCE_DIR="$PROJECT_SOURCE"
 fi
-
+ 
 echo "=========================================="
 echo "Deploying Project: $PROJECT_NAME"
 echo "Environment: $ENVIRONMENT"
 echo "=========================================="
-
+ 
 DEPLOY_DIR="$DEPLOY_TARGET/$PROJECT_NAME"
 echo "Deploying to: $DEPLOY_DIR"
-
+ 
 mkdir -p "$(dirname "$DEPLOY_DIR")"
-
+ 
 if [ -d "$DEPLOY_DIR" ]; then
   echo "Removing existing project..."
   rm -rf "$DEPLOY_DIR"
 fi
-
+ 
 echo "Copying project files..."
 cp -r "$SOURCE_DIR" "$DEPLOY_DIR"
-
+ 
 if [ "$IS_ZIP" = true ]; then rm -rf "$TEMP_DIR"; fi
-
+ 
 echo "Verifying gateway health..."
 if ! curl -s -f "${GATEWAY_URL}/StatusPing" > /dev/null 2>&1; then
   echo "Gateway not responding at ${GATEWAY_URL}"
   exit 1
 fi
 echo "Gateway is healthy"
-
+ 
 # Tags aur unary-resource deploy karo
 TAGS_SOURCE="$DEPLOY_DIR/ignition/tags/tags.json"
 RESOURCE_SOURCE="$DEPLOY_DIR/ignition/tags/unary-resource.json"
-
+ 
 if [ -f "$TAGS_SOURCE" ] && [ -n "$TAGS_ROOT" ]; then
   echo "Deploying tags to file system..."
   mkdir -p "$TAGS_ROOT"
-
+ 
   cp "$TAGS_SOURCE" "$TAGS_ROOT/tags.json"
   echo "  Tags copied successfully!"
-
+ 
   if [ -f "$RESOURCE_SOURCE" ]; then
     cp "$RESOURCE_SOURCE" "$TAGS_ROOT/unary-resource.json"
     echo "  unary-resource.json copied!"
@@ -124,20 +124,26 @@ if [ -f "$TAGS_SOURCE" ] && [ -n "$TAGS_ROOT" ]; then
 EOF
     echo "  unary-resource.json created!"
   fi
-
-  # Ignition ko file detect karne ka time do
-  echo "Waiting for Ignition to detect changes..."
-  sleep 15
-  echo "Tags should be loaded in Ignition now!"
-
+ 
+  # WebDev se automatically reload karo — no restart needed!
+  echo "Reloading tags via WebDev..."
+  RELOAD_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+    -X POST \
+    "${GATEWAY_URL}/system/webdev/TestProject/api/reloadtags")
+  echo "  Tag reload: HTTP $RELOAD_CODE"
+  if [ "$RELOAD_CODE" = "200" ]; then
+    echo "  Tags reloaded successfully — no restart needed!"
+  else
+    echo "  Reload failed: HTTP $RELOAD_CODE"
+  fi
+ 
 else
   echo "  No tags file or tags_root not configured — skipping"
 fi
-
+ 
 echo ""
 echo "Project deployed successfully!"
 echo "  Project: $PROJECT_NAME"
 echo "  Location: $DEPLOY_DIR"
 echo "  Gateway: ${GATEWAY_URL}/web/home"
 echo ""
-
