@@ -1,6 +1,0 @@
-{
-  "title": "Factory Dashboard",
-  "description": "Factory floor monitoring and control dashboard",
-  "enabled": true,
-  "inheritable": false
-}
