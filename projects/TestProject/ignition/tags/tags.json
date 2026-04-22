@@ -1,23 +1,27 @@
-[
-  {
-    "valueSource": "memory",
-    "name": "Temperature",
-    "defaultValue": 180.0,
-    "tagType": "AtomicTag",
-    "dataType": "Float4"
-  },
-  {
-    "valueSource": "memory",
-    "name": "Pressure",
-    "defaultValue": 200.0,
-    "tagType": "AtomicTag",
-    "dataType": "Float4"
-  },
-  {
-    "valueSource": "memory",
-    "name": "Speed",
-    "defaultValue": 90.0,
-    "tagType": "AtomicTag",
-    "dataType": "Float4"
-  }
-]
+{
+  "name": "",
+  "tagType": "Provider",
+  "tags": [
+    {
+      "valueSource": "memory",
+      "name": "Temperature",
+      "defaultValue": 0.0,
+      "tagType": "AtomicTag",
+      "dataType": "Float4"
+    },
+    {
+      "valueSource": "memory",
+      "name": "Pressure",
+      "defaultValue": 0.0,
+      "tagType": "AtomicTag",
+      "dataType": "Float4"
+    },
+    {
+      "valueSource": "memory",
+      "name": "Speed",
+      "defaultValue": 0.0,
+      "tagType": "AtomicTag",
+      "dataType": "Float4"
+    }
+  ]
+}
