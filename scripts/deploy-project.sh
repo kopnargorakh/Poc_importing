@@ -1,149 +1,241 @@
-#!/bin/bash
- 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-ENVIRONMENT_INPUT=$1
-PROJECT_SOURCE=$2
- 
-if [ -z "$ENVIRONMENT_INPUT" ] || [ -z "$PROJECT_SOURCE" ]; then
-  echo "Error: Missing required arguments"
-  exit 1
-fi
- 
-case "$ENVIRONMENT_INPUT" in
-  local) ENVIRONMENT="local"; ENV_VAR_PREFIX="LOCAL" ;;
-  dev|development) ENVIRONMENT="dev"; ENV_VAR_PREFIX="DEV" ;;
-  staging) ENVIRONMENT="staging"; ENV_VAR_PREFIX="STAGING" ;;
-  prod|production) ENVIRONMENT="prod"; ENV_VAR_PREFIX="PROD" ;;
-  *) echo "Error: Unknown environment: $ENVIRONMENT_INPUT"; exit 1 ;;
-esac
- 
-IS_ZIP=false
-if [ -f "$PROJECT_SOURCE" ] && [[ "$PROJECT_SOURCE" == *.zip ]]; then
-  IS_ZIP=true
-elif [ ! -d "$PROJECT_SOURCE" ]; then
-  echo "Error: Project source not found: $PROJECT_SOURCE"
-  exit 1
-fi
- 
-CONFIG_FILE="$PROJECT_ROOT/config/environments/${ENVIRONMENT}.yaml"
-if [ ! -f "$CONFIG_FILE" ]; then
-  echo "Error: Config file not found: $CONFIG_FILE"
-  exit 1
-fi
- 
-DEPLOY_ROOT=$(grep "^deploy_root:" "$CONFIG_FILE" | sed 's/^deploy_root:[[:space:]]*//' | tr -d '"')
-TAGS_ROOT=$(grep "^tags_root:" "$CONFIG_FILE" | sed 's/^tags_root:[[:space:]]*//' | tr -d '"')
-GATEWAY_URL_FROM_CONFIG=$(grep "url:" "$CONFIG_FILE" | head -1 | awk '{print $2}')
- 
-GATEWAY_URL_ENV_VAR="${ENV_VAR_PREFIX}_GATEWAY_URL"
-GATEWAY_API_KEY_ENV_VAR="${ENV_VAR_PREFIX}_GATEWAY_API_KEY"
-GATEWAY_PASS_ENV_VAR="${ENV_VAR_PREFIX}_GATEWAY_PASS"
-GATEWAY_URL="$(eval echo \$${GATEWAY_URL_ENV_VAR})"
-API_KEY="$(eval echo \$${GATEWAY_API_KEY_ENV_VAR})"
-GATEWAY_PASS="$(eval echo \$${GATEWAY_PASS_ENV_VAR})"
- 
-if [ -z "$GATEWAY_URL" ]; then GATEWAY_URL="$GATEWAY_URL_FROM_CONFIG"; fi
- 
-if [ -n "$DEPLOY_ROOT" ]; then
-  DEPLOY_TARGET="$DEPLOY_ROOT"
-else
-  DEPLOY_TARGET="$PROJECT_ROOT"
-fi
- 
-echo "DEBUG: DEPLOY_TARGET=$DEPLOY_TARGET"
-echo "DEBUG: TAGS_ROOT=$TAGS_ROOT"
- 
-if [ "$IS_ZIP" = true ]; then
-  TEMP_DIR=$(mktemp -d)
-  unzip -q "$PROJECT_SOURCE" -d "$TEMP_DIR"
-  SOURCE_DIR="$TEMP_DIR"
-  ZIP_BASENAME=$(basename "$PROJECT_SOURCE" .zip)
-  PROJECT_NAME=$(echo "$ZIP_BASENAME" | sed -E 's/-+[v]?[0-9]+\.[0-9]+\.[0-9]+(-[a-f0-9]+)?$//' | sed -E 's/-+[a-f0-9]{7,}$//')
-  if [ -z "$PROJECT_NAME" ] || [ "$PROJECT_NAME" = "$ZIP_BASENAME" ]; then
-    PROJECT_NAME="$ZIP_BASENAME"
-  fi
-else
-  PROJECT_NAME=$(basename "$PROJECT_SOURCE")
-  SOURCE_DIR="$PROJECT_SOURCE"
-fi
- 
-echo "=========================================="
-echo "Deploying Project: $PROJECT_NAME"
-echo "Environment: $ENVIRONMENT"
-echo "=========================================="
- 
-DEPLOY_DIR="$DEPLOY_TARGET/$PROJECT_NAME"
-echo "Deploying to: $DEPLOY_DIR"
- 
-mkdir -p "$(dirname "$DEPLOY_DIR")"
- 
-if [ -d "$DEPLOY_DIR" ]; then
-  echo "Removing existing project..."
-  rm -rf "$DEPLOY_DIR"
-fi
- 
-echo "Copying project files..."
-cp -r "$SOURCE_DIR" "$DEPLOY_DIR"
- 
-if [ "$IS_ZIP" = true ]; then rm -rf "$TEMP_DIR"; fi
- 
-echo "Verifying gateway health..."
-if ! curl -s -f "${GATEWAY_URL}/StatusPing" > /dev/null 2>&1; then
-  echo "Gateway not responding at ${GATEWAY_URL}"
-  exit 1
-fi
-echo "Gateway is healthy"
- 
-# Tags aur unary-resource deploy karo
-TAGS_SOURCE="$DEPLOY_DIR/ignition/tags/tags.json"
-RESOURCE_SOURCE="$DEPLOY_DIR/ignition/tags/unary-resource.json"
- 
-if [ -f "$TAGS_SOURCE" ] && [ -n "$TAGS_ROOT" ]; then
-  echo "Deploying tags to file system..."
-  mkdir -p "$TAGS_ROOT"
- 
-  cp "$TAGS_SOURCE" "$TAGS_ROOT/tags.json"
-  echo "  Tags copied successfully!"
- 
-  if [ -f "$RESOURCE_SOURCE" ]; then
-    cp "$RESOURCE_SOURCE" "$TAGS_ROOT/unary-resource.json"
-    echo "  unary-resource.json copied!"
-  else
-    cat > "$TAGS_ROOT/unary-resource.json" << 'EOF'
-{
-  "scope": "G",
-  "version": 1,
-  "restricted": false,
-  "overridable": true,
-  "files": ["tags.json"],
-  "attributes": {
-    "config": {}
-  }
-}
-EOF
-    echo "  unary-resource.json created!"
-  fi
- 
-  # WebDev se automatically reload karo — no restart needed!
-  echo "Reloading tags via WebDev..."
-  RELOAD_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-    -X POST \
-    "${GATEWAY_URL}/system/webdev/TestProject/api/reloadtags")
-  echo "  Tag reload: HTTP $RELOAD_CODE"
-  if [ "$RELOAD_CODE" = "200" ]; then
-    echo "  Tags reloaded successfully — no restart needed!"
-  else
-    echo "  Reload failed: HTTP $RELOAD_CODE"
-  fi
- 
-else
-  echo "  No tags file or tags_root not configured — skipping"
-fi
- 
-echo ""
-echo "Project deployed successfully!"
-echo "  Project: $PROJECT_NAME"
-echo "  Location: $DEPLOY_DIR"
-echo "  Gateway: ${GATEWAY_URL}/web/home"
-echo ""
+# GitHub Actions CI/CD Pipeline for Ignition 8.3
+# Development only deployment
+name: CI/CD Pipeline
+permissions:
+  contents: read
+concurrency:
+  group: ci-cd-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+on:
+  push:
+    branches:
+      - develop
+      - release/*       # ← NEW: auto triggers staging deploy
+  pull_request:
+    branches:
+      - develop
+
+  # ← NEW: manual trigger to pick environment + deploy type
+  workflow_dispatch:
+    inputs:
+      deploy_type:
+        description: 'Deploy type'
+        required: true
+        default: 'project'
+        type: choice
+        options:
+          - project      # views + scripts + tags (no restart)
+          - gateway      # full gateway config + restart
+      target_env:
+        description: 'Target environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+
+env:
+  BUILD_CONFIGURATION: Release
+
+jobs:
+  build:
+    name: Build and Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Validate Project Names and Structure
+        run: |
+          chmod +x ./scripts/validate-names.sh
+          ./scripts/validate-names.sh ./projects
+      - name: Package All Projects
+        run: |
+          set -e
+          echo "Packaging all Ignition projects..."
+          mkdir -p build/
+          if [ ! -d "projects" ] || [ -z "$(ls -A projects 2>/dev/null)" ]; then
+            echo "No projects found, creating marker file..."
+            echo "no-projects" > build/.no-projects
+          else
+            chmod +x ./scripts/package-project.sh
+            for dir in projects/*/; do
+              if [ -d "$dir" ]; then
+                echo "Packaging $(basename $dir)..."
+                ./scripts/package-project.sh "$dir"
+              fi
+            done
+          fi
+          ls -lh build/
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            build/
+            scripts/
+            config/
+            migrations/
+
+  test-pylib:
+    name: Test Python Libraries
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run pylib tests
+        run: |
+          chmod +x ./scripts/test-pylib.sh
+          ./scripts/test-pylib.sh pylib/Mustry/Tests
+
+  # ───────────────────────────────────────────────────────────
+  # DEVELOPMENT
+  # Secrets used (from screenshot):
+  #   DEV_GATEWAY_KEY   ← API key
+  #   DEV_GATEWAY_PASS  ← password
+  #   DEV_GATEWAY_URL   ← gateway URL
+  #
+  # TestProject     → UNCHANGED (exactly as original)
+  # FactoryDashboard → NEW (added below TestProject)
+  # ───────────────────────────────────────────────────────────
+  deploy-dev:
+    name: Deploy to Development
+    runs-on: self-hosted
+    needs: [build, test-pylib]
+    if: |
+      (github.ref == 'refs/heads/develop' && github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.target_env == 'dev')
+    environment:
+      name: development
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts-${{ github.sha }}
+          path: ./artifacts
+
+      # ── TestProject — UNCHANGED ──────────────────────────────
+      - name: Deploy to Development Gateway
+        shell: powershell
+        run: |
+          $env:DEV_GATEWAY_URL     = "${{ secrets.DEV_GATEWAY_URL }}"
+          $env:DEV_GATEWAY_API_KEY = "${{ secrets.DEV_GATEWAY_KEY }}"
+          $env:DEV_GATEWAY_PASS    = "${{ secrets.DEV_GATEWAY_PASS }}"
+          & "C:\Program Files\Git\bin\bash.exe" -c "DEV_GATEWAY_URL='$env:DEV_GATEWAY_URL' DEV_GATEWAY_API_KEY='$env:DEV_GATEWAY_API_KEY' DEV_GATEWAY_PASS='$env:DEV_GATEWAY_PASS' ./scripts/deploy-project.sh dev projects/TestProject"
+        env:
+          DEV_GATEWAY_URL:     ${{ secrets.DEV_GATEWAY_URL }}
+          DEV_GATEWAY_API_KEY: ${{ secrets.DEV_GATEWAY_KEY }}
+          DEV_GATEWAY_PASS:    ${{ secrets.DEV_GATEWAY_PASS }}
+
+      # ── FactoryDashboard — NEW ────────────────────────────────
+      # Resolve deploy type:
+      #   auto push → always 'project' (safe, no restart)
+      #   manual    → use chosen input
+      - name: Resolve Deploy Type
+        shell: powershell
+        run: |
+          $deployType = "${{ github.event.inputs.deploy_type }}"
+          if ([string]::IsNullOrEmpty($deployType)) { $deployType = "project" }
+          "DEPLOY_TYPE=$deployType" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "FactoryDashboard deploy type: $deployType"
+
+      - name: Deploy FactoryDashboard to Development (project)
+        if: env.DEPLOY_TYPE == 'project'
+        shell: powershell
+        run: |
+          $env:DEV_GATEWAY_URL     = "${{ secrets.DEV_GATEWAY_URL }}"
+          $env:DEV_GATEWAY_API_KEY = "${{ secrets.DEV_GATEWAY_KEY }}"
+          $env:DEV_GATEWAY_PASS    = "${{ secrets.DEV_GATEWAY_PASS }}"
+          & "C:\Program Files\Git\bin\bash.exe" -c "DEV_GATEWAY_URL='$env:DEV_GATEWAY_URL' DEV_GATEWAY_API_KEY='$env:DEV_GATEWAY_API_KEY' DEV_GATEWAY_PASS='$env:DEV_GATEWAY_PASS' ./scripts/deploy-project.sh dev projects/FactoryDashboard"
+        env:
+          DEV_GATEWAY_URL:     ${{ secrets.DEV_GATEWAY_URL }}
+          DEV_GATEWAY_API_KEY: ${{ secrets.DEV_GATEWAY_KEY }}
+          DEV_GATEWAY_PASS:    ${{ secrets.DEV_GATEWAY_PASS }}
+
+      - name: Deploy FactoryDashboard to Development (gateway)
+        if: env.DEPLOY_TYPE == 'gateway'
+        shell: powershell
+        run: |
+          $env:DEV_GATEWAY_URL     = "${{ secrets.DEV_GATEWAY_URL }}"
+          $env:DEV_GATEWAY_API_KEY = "${{ secrets.DEV_GATEWAY_KEY }}"
+          $env:DEV_GATEWAY_PASS    = "${{ secrets.DEV_GATEWAY_PASS }}"
+          & "C:\Program Files\Git\bin\bash.exe" -c "DEV_GATEWAY_URL='$env:DEV_GATEWAY_URL' DEV_GATEWAY_API_KEY='$env:DEV_GATEWAY_API_KEY' DEV_GATEWAY_PASS='$env:DEV_GATEWAY_PASS' ./scripts/deploy-gateway.sh dev projects/FactoryDashboard"
+        env:
+          DEV_GATEWAY_URL:     ${{ secrets.DEV_GATEWAY_URL }}
+          DEV_GATEWAY_API_KEY: ${{ secrets.DEV_GATEWAY_KEY }}
+          DEV_GATEWAY_PASS:    ${{ secrets.DEV_GATEWAY_PASS }}
+
+  # ───────────────────────────────────────────────────────────
+  # STAGING — FactoryDashboard only
+  # Secrets used (from screenshot):
+  #   STAGE_GATEWAY_API_KEY ← API key
+  #   STAGE_GATEWAY_PASS    ← password
+  #   STAGE_GATEWAY_URL     ← gateway URL (172.16.3.120:8088)
+  #
+  # Triggers:
+  #   push to release/*           → auto deploy
+  #   manual with target_env=staging → manual deploy
+  #
+  # Runner: self-hosted-staging
+  #   → must be installed on RDP server 172.16.3.120
+  # ───────────────────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy FactoryDashboard to Staging
+    runs-on: self-hosted-staging
+    needs: [build, test-pylib]
+    if: |
+      (startsWith(github.ref, 'refs/heads/release/') && github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.target_env == 'staging')
+    environment:
+      name: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts-${{ github.sha }}
+          path: ./artifacts
+
+      - name: Resolve Deploy Type
+        shell: powershell
+        run: |
+          $deployType = "${{ github.event.inputs.deploy_type }}"
+          if ([string]::IsNullOrEmpty($deployType)) { $deployType = "project" }
+          "DEPLOY_TYPE=$deployType" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "FactoryDashboard deploy type: $deployType"
+
+      - name: Deploy FactoryDashboard to Staging (project)
+        if: env.DEPLOY_TYPE == 'project'
+        shell: powershell
+        run: |
+          $env:STAGING_GATEWAY_URL     = "${{ secrets.STAGE_GATEWAY_URL }}"
+          $env:STAGING_GATEWAY_API_KEY = "${{ secrets.STAGE_GATEWAY_API_KEY }}"
+          $env:STAGING_GATEWAY_PASS    = "${{ secrets.STAGE_GATEWAY_PASS }}"
+          & "C:\Program Files\Git\bin\bash.exe" -c "STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' ./scripts/deploy-project.sh staging projects/FactoryDashboard"
+        env:
+          STAGING_GATEWAY_URL:     ${{ secrets.STAGE_GATEWAY_URL }}
+          STAGING_GATEWAY_API_KEY: ${{ secrets.STAGE_GATEWAY_API_KEY }}
+          STAGING_GATEWAY_PASS:    ${{ secrets.STAGE_GATEWAY_PASS }}
+
+      - name: Deploy FactoryDashboard to Staging (gateway)
+        if: env.DEPLOY_TYPE == 'gateway'
+        shell: powershell
+        run: |
+          $env:STAGING_GATEWAY_URL     = "${{ secrets.STAGE_GATEWAY_URL }}"
+          $env:STAGING_GATEWAY_API_KEY = "${{ secrets.STAGE_GATEWAY_API_KEY }}"
+          $env:STAGING_GATEWAY_PASS    = "${{ secrets.STAGE_GATEWAY_PASS }}"
+          & "C:\Program Files\Git\bin\bash.exe" -c "STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' ./scripts/deploy-gateway.sh staging projects/FactoryDashboard"
+        env:
+          STAGING_GATEWAY_URL:     ${{ secrets.STAGE_GATEWAY_URL }}
+          STAGING_GATEWAY_API_KEY: ${{ secrets.STAGE_GATEWAY_API_KEY }}
+          STAGING_GATEWAY_PASS:    ${{ secrets.STAGE_GATEWAY_PASS }}
