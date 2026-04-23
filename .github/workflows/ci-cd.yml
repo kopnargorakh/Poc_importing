@@ -1,4 +1,4 @@
-# GitHub Actions CI/CD Pipeline for Ignition 8.3
+# #GitHub Actions CI/CD Pipeline for Ignition 8.3
 # Deploy method: Direct file copy (xcopy) to Ignition projects folder
 # No API upload, no zip — files copied directly on the server
 # Dev:     self-hosted runner on 172.16.3.148
