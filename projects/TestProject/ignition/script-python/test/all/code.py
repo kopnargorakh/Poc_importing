@@ -2,7 +2,7 @@ def runTests():
 	"""Run all tests after deploy"""
 	results = []
 
-	# Run pylib tests
+	# #Run pylib tests
 	try:
 		pylibResults = test.pylib.runTests()
 		results.append("=== PYLIB TESTS ===")
