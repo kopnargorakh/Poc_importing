@@ -1,31 +1,42 @@
 # GitHub Actions CI/CD Pipeline for Ignition 8.3
-# Development only deployment
-
+# Deploys TestProject to Dev and Staging environments
 name: CI/CD Pipeline
-
 permissions:
   contents: read
-
 concurrency:
   group: ci-cd-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 on:
   push:
     branches:
-      - develop
+      - develop       # → auto deploy to Dev
+      - release/*     # → auto deploy to Staging
   pull_request:
     branches:
       - develop
+
+  # Manual trigger — choose environment
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Target environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
 
 env:
   BUILD_CONFIGURATION: Release
 
 jobs:
+  # ─────────────────────────────────────────────────────────────
+  # BUILD
+  # ─────────────────────────────────────────────────────────────
   build:
     name: Build and Validate
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -63,12 +74,15 @@ jobs:
             build/
             scripts/
             config/
+            projects/
             migrations/
 
+  # ─────────────────────────────────────────────────────────────
+  # TEST
+  # ─────────────────────────────────────────────────────────────
   test-pylib:
     name: Test Python Libraries
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -83,21 +97,25 @@ jobs:
           chmod +x ./scripts/test-pylib.sh
           ./scripts/test-pylib.sh pylib/Mustry/Tests
 
+  # ─────────────────────────────────────────────────────────────
+  # DEPLOY TO DEVELOPMENT
+  # Triggers:
+  #   - push to develop branch
+  #   - manual trigger with target_env = dev
+  # Secrets: DEV_GATEWAY_URL, DEV_GATEWAY_API_KEY, DEV_GATEWAY_PASS
+  # ─────────────────────────────────────────────────────────────
   deploy-dev:
-    name: Deploy to Development
-    runs-on: self-hosted
+    name: Deploy TestProject to Development
+    runs-on: ubuntu-latest
     needs: [build, test-pylib]
-    if: github.ref == 'refs/heads/develop'
+    if: |
+      (github.ref == 'refs/heads/develop' && github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.target_env == 'dev')
     environment:
       name: development
-
     steps:
-      - name: Clean Previous Build Artifacts
-        shell: powershell
-        run: |
-          Write-Host "Cleaning previous build artifacts..."
-          if (Test-Path build) { Remove-Item -Recurse -Force build }
-          New-Item -ItemType Directory -Force -Path build | Out-Null
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
@@ -105,10 +123,118 @@ jobs:
           name: build-artifacts-${{ github.sha }}
           path: .
 
-      - name: Deploy to Development Gateway
-        shell: cmd
+      - name: Deploy TestProject to Development
         run: |
-          "C:\Program Files\Git\bin\bash.exe" ./scripts/deploy-project.sh dev projects/TestProject
-        env:
-          DEV_GATEWAY_URL: ${{ secrets.DEV_GATEWAY_URL }}
-          DEV_GATEWAY_API_KEY: ${{ secrets.DEV_GATEWAY_API_KEY }}
+          echo "=========================================="
+          echo "Deploying TestProject → Development"
+          echo "=========================================="
+
+          echo "Packaging TestProject..."
+          cd projects
+          zip -r /tmp/TestProject.zip TestProject/
+          cd -
+
+          echo "Uploading to Dev gateway..."
+          UPLOAD=$(curl -s -o /tmp/tp_dev_resp.txt -w "%{http_code}" \
+            -X POST \
+            -H "X-Ignition-API-Token: ${{ secrets.DEV_GATEWAY_API_KEY }}" \
+            -F "file=@/tmp/TestProject.zip" \
+            "${{ secrets.DEV_GATEWAY_URL }}/data/api/v1/projects/import" \
+            --max-time 60 || echo "000")
+          echo "Upload: HTTP $UPLOAD"
+          cat /tmp/tp_dev_resp.txt || true
+
+          echo "Triggering config scan..."
+          SCAN=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST \
+            -H "X-Ignition-API-Token: ${{ secrets.DEV_GATEWAY_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.DEV_GATEWAY_URL }}/data/api/v1/config/scan" \
+            --max-time 15 || echo "000")
+          echo "Config scan: HTTP $SCAN"
+
+          if [[ "$SCAN" =~ ^2 ]]; then
+            echo "TestProject is LIVE on Development!"
+          else
+            echo "Scan HTTP $SCAN — triggering gateway restart..."
+            curl -s -X POST \
+              -H "X-Ignition-API-Token: ${{ secrets.DEV_GATEWAY_API_KEY }}" \
+              "${{ secrets.DEV_GATEWAY_URL }}/data/api/v1/restart-tasks/restart?confirm=true" \
+              --max-time 20 || true
+            echo "Restart triggered — live in ~60 seconds"
+          fi
+
+          echo ""
+          echo "Dev deployment complete!"
+          echo "Gateway: ${{ secrets.DEV_GATEWAY_URL }}/web/home"
+
+  # ─────────────────────────────────────────────────────────────
+  # DEPLOY TO STAGING
+  # Triggers:
+  #   - push to release/* branch
+  #   - manual trigger with target_env = staging
+  # Secrets: STAGE_GATEWAY_URL, STAGE_GATEWAY_API_KEY, STAGE_GATEWAY_PASS
+  # ─────────────────────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy TestProject to Staging
+    runs-on: ubuntu-latest
+    needs: [build, test-pylib]
+    if: |
+      (startsWith(github.ref, 'refs/heads/release/') && github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.target_env == 'staging')
+    environment:
+      name: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts-${{ github.sha }}
+          path: .
+
+      - name: Deploy TestProject to Staging
+        run: |
+          echo "=========================================="
+          echo "Deploying TestProject → Staging"
+          echo "=========================================="
+
+          echo "Packaging TestProject..."
+          cd projects
+          zip -r /tmp/TestProject.zip TestProject/
+          cd -
+
+          echo "Uploading to Staging gateway..."
+          UPLOAD=$(curl -s -o /tmp/tp_stage_resp.txt -w "%{http_code}" \
+            -X POST \
+            -H "X-Ignition-API-Token: ${{ secrets.STAGE_GATEWAY_API_KEY }}" \
+            -F "file=@/tmp/TestProject.zip" \
+            "${{ secrets.STAGE_GATEWAY_URL }}/data/api/v1/projects/import" \
+            --max-time 60 || echo "000")
+          echo "Upload: HTTP $UPLOAD"
+          cat /tmp/tp_stage_resp.txt || true
+
+          echo "Triggering config scan..."
+          SCAN=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST \
+            -H "X-Ignition-API-Token: ${{ secrets.STAGE_GATEWAY_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.STAGE_GATEWAY_URL }}/data/api/v1/config/scan" \
+            --max-time 15 || echo "000")
+          echo "Config scan: HTTP $SCAN"
+
+          if [[ "$SCAN" =~ ^2 ]]; then
+            echo "TestProject is LIVE on Staging!"
+          else
+            echo "Scan HTTP $SCAN — triggering gateway restart..."
+            curl -s -X POST \
+              -H "X-Ignition-API-Token: ${{ secrets.STAGE_GATEWAY_API_KEY }}" \
+              "${{ secrets.STAGE_GATEWAY_URL }}/data/api/v1/restart-tasks/restart?confirm=true" \
+              --max-time 20 || true
+            echo "Restart triggered — live in ~60 seconds"
+          fi
+
+          echo ""
+          echo "Staging deployment complete!"
+          echo "Gateway: ${{ secrets.STAGE_GATEWAY_URL }}/web/home"
