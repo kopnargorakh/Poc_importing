@@ -11,7 +11,7 @@ def readTags(tagPaths):
 		dict: Dictionary of {tagPath: value}
 	"""
 	
-	# Perform a blocking read on all tag paths
+	## Perform a blocking read on all tag paths
 	results = system.tag.readBlocking(tagPaths)
 	
 	# Create a dictionary to store results
