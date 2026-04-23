@@ -1,5 +1,9 @@
 # GitHub Actions CI/CD Pipeline for Ignition 8.3
-# Deploys TestProject to Dev and Staging environments
+# Deploy method: Direct file copy (xcopy) to Ignition projects folder
+# No API upload, no zip — files copied directly on the server
+# Dev:     self-hosted runner on 172.16.3.148
+# Staging: self-hosted-staging runner on 172.16.3.120
+
 name: CI/CD Pipeline
 permissions:
   contents: read
@@ -15,7 +19,6 @@ on:
     branches:
       - develop
 
-  # Manual trigger — choose environment
   workflow_dispatch:
     inputs:
       target_env:
@@ -32,7 +35,7 @@ env:
 
 jobs:
   # ─────────────────────────────────────────────────────────────
-  # BUILD
+  # BUILD — runs on GitHub cloud
   # ─────────────────────────────────────────────────────────────
   build:
     name: Build and Validate
@@ -99,14 +102,13 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────
   # DEPLOY TO DEVELOPMENT
-  # Triggers:
-  #   - push to develop branch
-  #   - manual trigger with target_env = dev
-  # Secrets: DEV_GATEWAY_URL, DEV_GATEWAY_API_KEY, DEV_GATEWAY_PASS
+  # Runner: self-hosted on 172.16.3.148 (same machine as Ignition)
+  # Method: xcopy files directly → curl localhost:8088
+  # No firewall issues, no tunnel needed
   # ─────────────────────────────────────────────────────────────
   deploy-dev:
-    name: Deploy TestProject to Development
-    runs-on: ubuntu-latest
+    name: Deploy to Development
+    runs-on: self-hosted          # ← runner on same machine as Ignition
     needs: [build, test-pylib]
     if: |
       (github.ref == 'refs/heads/develop' && github.event_name == 'push') ||
@@ -121,69 +123,124 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-artifacts-${{ github.sha }}
-          path: .
+          path: ./artifacts
 
-      - name: Deploy TestProject to Development
+      # ── Fix permissions first ──────────────────────────────────
+      - name: Fix Ignition folder permissions
+        shell: powershell
         run: |
-          echo "=========================================="
-          echo "Deploying TestProject → Development"
-          echo "=========================================="
+          $path = "C:\Program Files\Inductive Automation\Ignition\data"
+          if (Test-Path $path) {
+            Write-Host "Fixing permissions on $path..."
+            icacls $path /grant "gorakh:(OI)(CI)F" /T 2>$null | Out-Null
+            Write-Host "Permissions fixed!"
+          }
 
-          echo "Packaging TestProject..."
-          cd projects
-          zip -r /tmp/TestProject.zip TestProject/
-          cd -
+      # ── Deploy TestProject ─────────────────────────────────────
+      - name: Deploy TestProject to Development
+        shell: cmd
+        run: |
+          echo Deploying TestProject...
+          set DEST=C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject
 
-          echo "Uploading to Dev gateway..."
-          UPLOAD=$(curl -s -o /tmp/tp_dev_resp.txt -w "%{http_code}" \
-            -X POST \
-            -H "X-Ignition-API-Token: ${{ secrets.DEV_GATEWAY_API_KEY }}" \
-            -F "file=@/tmp/TestProject.zip" \
-            "${{ secrets.DEV_GATEWAY_URL }}/data/api/v1/projects/import" \
-            --max-time 60 || echo "000")
-          echo "Upload: HTTP $UPLOAD"
-          cat /tmp/tp_dev_resp.txt || true
+          if exist "%DEST%" (
+            echo Removing old project...
+            rmdir /S /Q "%DEST%"
+          )
 
-          echo "Triggering config scan..."
-          SCAN=$(curl -s -o /dev/null -w "%{http_code}" \
-            -X POST \
-            -H "X-Ignition-API-Token: ${{ secrets.DEV_GATEWAY_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            "${{ secrets.DEV_GATEWAY_URL }}/data/api/v1/config/scan" \
-            --max-time 15 || echo "000")
-          echo "Config scan: HTTP $SCAN"
+          echo Copying new files...
+          xcopy /E /I /Y "artifacts\projects\TestProject" "%DEST%"
 
-          if [[ "$SCAN" =~ ^2 ]]; then
-            echo "TestProject is LIVE on Development!"
-          else
-            echo "Scan HTTP $SCAN — triggering gateway restart..."
-            curl -s -X POST \
-              -H "X-Ignition-API-Token: ${{ secrets.DEV_GATEWAY_API_KEY }}" \
-              "${{ secrets.DEV_GATEWAY_URL }}/data/api/v1/restart-tasks/restart?confirm=true" \
-              --max-time 20 || true
-            echo "Restart triggered — live in ~60 seconds"
-          fi
+          echo Checking copy result...
+          if exist "%DEST%\project.json" (
+            echo TestProject files copied successfully!
+          ) else (
+            echo ERROR: project.json not found after copy!
+            exit /b 1
+          )
 
-          echo ""
-          echo "Dev deployment complete!"
-          echo "Gateway: ${{ secrets.DEV_GATEWAY_URL }}/web/home"
+          echo Triggering config scan on localhost...
+          curl -s -X POST ^
+            -H "X-Ignition-API-Token: %DEV_GATEWAY_API_KEY%" ^
+            -H "Content-Type: application/json" ^
+            "http://localhost:8088/data/api/v1/config/scan"
+
+          echo TestProject deployed to Dev!
+        env:
+          DEV_GATEWAY_API_KEY: ${{ secrets.DEV_GATEWAY_API_KEY }}
+
+      # ── Deploy FactoryDashboard ────────────────────────────────
+      - name: Deploy FactoryDashboard to Development
+        shell: cmd
+        run: |
+          echo Deploying FactoryDashboard...
+          set DEST=C:\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard
+
+          if exist "%DEST%" (
+            echo Removing old project...
+            rmdir /S /Q "%DEST%"
+          )
+
+          echo Copying new files...
+          xcopy /E /I /Y "artifacts\projects\FactoryDashboard" "%DEST%"
+
+          echo Checking copy result...
+          if exist "%DEST%\project.json" (
+            echo FactoryDashboard files copied successfully!
+          ) else (
+            echo ERROR: project.json not found after copy!
+            exit /b 1
+          )
+
+          echo Triggering config scan...
+          curl -s -X POST ^
+            -H "X-Ignition-API-Token: %DEV_GATEWAY_API_KEY%" ^
+            -H "Content-Type: application/json" ^
+            "http://localhost:8088/data/api/v1/config/scan"
+
+          echo FactoryDashboard deployed to Dev!
+        env:
+          DEV_GATEWAY_API_KEY: ${{ secrets.DEV_GATEWAY_API_KEY }}
+
+      # ── Verify deployment ──────────────────────────────────────
+      - name: Verify Dev Deployment
+        shell: cmd
+        run: |
+          echo ==========================================
+          echo Verifying Dev deployment...
+          echo ==========================================
+
+          if exist "C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject\project.json" (
+            echo [OK] TestProject deployed
+          ) else (
+            echo [FAIL] TestProject missing!
+          )
+
+          if exist "C:\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard\project.json" (
+            echo [OK] FactoryDashboard deployed
+          ) else (
+            echo [FAIL] FactoryDashboard missing!
+          )
+
+          echo Gateway: http://localhost:8088/web/home
 
   # ─────────────────────────────────────────────────────────────
   # DEPLOY TO STAGING
-  # Triggers:
-  #   - push to release/* branch
-  #   - manual trigger with target_env = staging
-  # Secrets: STAGE_GATEWAY_URL, STAGE_GATEWAY_API_KEY, STAGE_GATEWAY_PASS
+  # Runner: self-hosted-staging on 172.16.3.120
+  # Method: xcopy files directly → curl localhost:8088
+  # Needs: deploy-dev to complete first
+  # Approval: set Required Reviewers on staging environment
+  #   GitHub → Settings → Environments → staging → Required reviewers
   # ─────────────────────────────────────────────────────────────
   deploy-staging:
-    name: Deploy TestProject to Staging
-    runs-on: ubuntu-latest
-    needs: [build, test-pylib]
+    name: Deploy to Staging
+    runs-on: self-hosted-staging  # ← runner on 172.16.3.120
+    needs: [deploy-dev]           # ← waits for dev to complete
     if: |
-      (startsWith(github.ref, 'refs/heads/release/') && github.event_name == 'push') ||
+      github.event_name == 'push' ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.target_env == 'staging')
     environment:
-      name: staging
+      name: staging               # ← approval popup from here
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -192,49 +249,94 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-artifacts-${{ github.sha }}
-          path: .
+          path: ./artifacts
 
-      - name: Deploy TestProject to Staging
+      # ── Fix permissions on staging server ─────────────────────
+      - name: Fix Ignition folder permissions
+        shell: powershell
         run: |
-          echo "=========================================="
-          echo "Deploying TestProject → Staging"
-          echo "=========================================="
+          $path = "C:\Program Files\Inductive Automation\Ignition\data"
+          if (Test-Path $path) {
+            icacls $path /grant "Administrator:(OI)(CI)F" /T 2>$null | Out-Null
+            Write-Host "Permissions fixed on staging!"
+          }
 
-          echo "Packaging TestProject..."
-          cd projects
-          zip -r /tmp/TestProject.zip TestProject/
-          cd -
+      # ── Deploy TestProject ─────────────────────────────────────
+      - name: Deploy TestProject to Staging
+        shell: cmd
+        run: |
+          echo Deploying TestProject to Staging...
+          set DEST=C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject
 
-          echo "Uploading to Staging gateway..."
-          UPLOAD=$(curl -s -o /tmp/tp_stage_resp.txt -w "%{http_code}" \
-            -X POST \
-            -H "X-Ignition-API-Token: ${{ secrets.STAGE_GATEWAY_API_KEY }}" \
-            -F "file=@/tmp/TestProject.zip" \
-            "${{ secrets.STAGE_GATEWAY_URL }}/data/api/v1/projects/import" \
-            --max-time 60 || echo "000")
-          echo "Upload: HTTP $UPLOAD"
-          cat /tmp/tp_stage_resp.txt || true
+          if exist "%DEST%" (
+            rmdir /S /Q "%DEST%"
+          )
 
-          echo "Triggering config scan..."
-          SCAN=$(curl -s -o /dev/null -w "%{http_code}" \
-            -X POST \
-            -H "X-Ignition-API-Token: ${{ secrets.STAGE_GATEWAY_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            "${{ secrets.STAGE_GATEWAY_URL }}/data/api/v1/config/scan" \
-            --max-time 15 || echo "000")
-          echo "Config scan: HTTP $SCAN"
+          xcopy /E /I /Y "artifacts\projects\TestProject" "%DEST%"
 
-          if [[ "$SCAN" =~ ^2 ]]; then
-            echo "TestProject is LIVE on Staging!"
-          else
-            echo "Scan HTTP $SCAN — triggering gateway restart..."
-            curl -s -X POST \
-              -H "X-Ignition-API-Token: ${{ secrets.STAGE_GATEWAY_API_KEY }}" \
-              "${{ secrets.STAGE_GATEWAY_URL }}/data/api/v1/restart-tasks/restart?confirm=true" \
-              --max-time 20 || true
-            echo "Restart triggered — live in ~60 seconds"
-          fi
+          if exist "%DEST%\project.json" (
+            echo TestProject files copied to staging!
+          ) else (
+            echo ERROR: Copy failed!
+            exit /b 1
+          )
 
-          echo ""
-          echo "Staging deployment complete!"
-          echo "Gateway: ${{ secrets.STAGE_GATEWAY_URL }}/web/home"
+          curl -s -X POST ^
+            -H "X-Ignition-API-Token: %STAGE_GATEWAY_API_KEY%" ^
+            -H "Content-Type: application/json" ^
+            "http://localhost:8088/data/api/v1/config/scan"
+
+          echo TestProject deployed to Staging!
+        env:
+          STAGE_GATEWAY_API_KEY: ${{ secrets.STAGE_GATEWAY_API_KEY }}
+
+      # ── Deploy FactoryDashboard ────────────────────────────────
+      - name: Deploy FactoryDashboard to Staging
+        shell: cmd
+        run: |
+          echo Deploying FactoryDashboard to Staging...
+          set DEST=C:\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard
+
+          if exist "%DEST%" (
+            rmdir /S /Q "%DEST%"
+          )
+
+          xcopy /E /I /Y "artifacts\projects\FactoryDashboard" "%DEST%"
+
+          if exist "%DEST%\project.json" (
+            echo FactoryDashboard files copied to staging!
+          ) else (
+            echo ERROR: Copy failed!
+            exit /b 1
+          )
+
+          curl -s -X POST ^
+            -H "X-Ignition-API-Token: %STAGE_GATEWAY_API_KEY%" ^
+            -H "Content-Type: application/json" ^
+            "http://localhost:8088/data/api/v1/config/scan"
+
+          echo FactoryDashboard deployed to Staging!
+        env:
+          STAGE_GATEWAY_API_KEY: ${{ secrets.STAGE_GATEWAY_API_KEY }}
+
+      # ── Verify ────────────────────────────────────────────────
+      - name: Verify Staging Deployment
+        shell: cmd
+        run: |
+          echo ==========================================
+          echo Verifying Staging deployment...
+          echo ==========================================
+
+          if exist "C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject\project.json" (
+            echo [OK] TestProject deployed to Staging
+          ) else (
+            echo [FAIL] TestProject missing on Staging!
+          )
+
+          if exist "C:\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard\project.json" (
+            echo [OK] FactoryDashboard deployed to Staging
+          ) else (
+            echo [FAIL] FactoryDashboard missing on Staging!
+          )
+
+          echo Staging Gateway: http://172.16.3.120:8088/web/home
