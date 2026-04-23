@@ -1,0 +1,22 @@
+---
+# Staging Environment Configuration
+environment: staging
+deploy_root: "C:/Program Files/Inductive Automation/Ignition/data/projects"
+tags_root: "C:/Program Files/Inductive Automation/Ignition/data/config/core/ignition/tag-definition/default"
+gateway_config_root: "C:/Program Files/Inductive Automation/Ignition/data/config"
+
+gateway:
+  url: http://localhost:8088
+  username: admin
+  backup_path: ./backups/staging
+
+database:
+  host: localhost
+  port: 5432
+  name: ignition_staging
+  username: ignition
+
+deployment:
+  auto_backup: true
+  backup_retention_days: 30
+  require_approval: false

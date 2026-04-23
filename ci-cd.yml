@@ -1,0 +1,257 @@
+# GitHub Actions CI/CD Pipeline for Ignition 8.3
+# Deploy method: xcopy directly to Ignition projects folder
+# Dev runner:     self-hosted on 172.16.3.148
+# Staging runner: self-hosted-staging on 172.16.3.120
+name: CI/CD Pipeline
+permissions:
+  contents: read
+concurrency:
+  group: ci-cd-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - develop
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Target environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+
+env:
+  BUILD_CONFIGURATION: Release
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # BUILD — GitHub cloud
+  # ─────────────────────────────────────────────────────────────
+  build:
+    name: Build and Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate Project Names and Structure
+        run: |
+          chmod +x ./scripts/validate-names.sh
+          ./scripts/validate-names.sh ./projects
+
+      - name: Package All Projects
+        run: |
+          set -e
+          echo "Packaging all Ignition projects..."
+          mkdir -p build/
+          if [ ! -d "projects" ] || [ -z "$(ls -A projects 2>/dev/null)" ]; then
+            echo "No projects found, creating marker file..."
+            echo "no-projects" > build/.no-projects
+          else
+            chmod +x ./scripts/package-project.sh
+            for dir in projects/*/; do
+              if [ -d "$dir" ]; then
+                echo "Packaging $(basename $dir)..."
+                ./scripts/package-project.sh "$dir"
+              fi
+            done
+          fi
+          ls -lh build/
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            build/
+            scripts/
+            config/
+            projects/
+            migrations/
+
+  # ─────────────────────────────────────────────────────────────
+  # TEST
+  # ─────────────────────────────────────────────────────────────
+  test-pylib:
+    name: Test Python Libraries
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run pylib tests
+        run: |
+          chmod +x ./scripts/test-pylib.sh
+          ./scripts/test-pylib.sh pylib/Mustry/Tests
+
+  # ─────────────────────────────────────────────────────────────
+  # DEPLOY TO DEVELOPMENT
+  # Runner on 172.16.3.148 — copies files directly to Ignition
+  # Uses localhost:8088 — no firewall/tunnel needed
+  # ─────────────────────────────────────────────────────────────
+  deploy-dev:
+    name: Deploy to Development
+    runs-on: self-hosted
+    needs: [build, test-pylib]
+    if: |
+      (github.ref == 'refs/heads/develop' && github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.target_env == 'dev')
+    environment:
+      name: development
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts-${{ github.sha }}
+          path: ./artifacts
+
+      - name: Fix Ignition Permissions
+        shell: powershell
+        run: |
+          $path = "C:\Program Files\Inductive Automation\Ignition\data"
+          icacls $path /grant "Administrator:(OI)(CI)F" /T 2>$null | Out-Null
+          Write-Host "Permissions OK"
+
+      - name: Deploy TestProject to Dev
+        shell: cmd
+        run: |
+          echo ==========================================
+          echo Deploying TestProject to Dev...
+          echo ==========================================
+          set DEST=C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject
+          if exist "%DEST%" ( rmdir /S /Q "%DEST%" )
+          xcopy /E /I /Y "artifacts\projects\TestProject" "%DEST%"
+          if not exist "%DEST%\project.json" (
+            echo ERROR: TestProject copy failed!
+            exit /b 1
+          )
+          echo TestProject copied OK!
+          curl -s -X POST -H "X-Ignition-API-Token: %DEV_GATEWAY_API_KEY%" -H "Content-Type: application/json" "http://localhost:8088/data/api/v1/config/scan"
+          echo TestProject deployed to Dev!
+        env:
+          DEV_GATEWAY_API_KEY: ${{ secrets.DEV_GATEWAY_API_KEY }}
+
+      - name: Deploy FactoryDashboard to Dev
+        shell: cmd
+        run: |
+          echo Deploying FactoryDashboard to Dev...
+          set DEST=C:\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard
+          if exist "%DEST%" ( rmdir /S /Q "%DEST%" )
+          xcopy /E /I /Y "artifacts\projects\FactoryDashboard" "%DEST%"
+          if not exist "%DEST%\project.json" (
+            echo ERROR: FactoryDashboard copy failed!
+            exit /b 1
+          )
+          echo FactoryDashboard copied OK!
+          curl -s -X POST -H "X-Ignition-API-Token: %DEV_GATEWAY_API_KEY%" -H "Content-Type: application/json" "http://localhost:8088/data/api/v1/config/scan"
+          echo FactoryDashboard deployed to Dev!
+        env:
+          DEV_GATEWAY_API_KEY: ${{ secrets.DEV_GATEWAY_API_KEY }}
+
+      - name: Verify Dev Deployment
+        shell: cmd
+        run: |
+          echo ==========================================
+          echo Verifying Dev deployment...
+          if exist "C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject\project.json" (
+            echo [OK] TestProject deployed
+          ) else ( echo [FAIL] TestProject missing! )
+          if exist "C:\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard\project.json" (
+            echo [OK] FactoryDashboard deployed
+          ) else ( echo [FAIL] FactoryDashboard missing! )
+          echo Dev URL: http://localhost:8088/web/home
+          echo ==========================================
+
+  # ─────────────────────────────────────────────────────────────
+  # DEPLOY TO STAGING
+  # Runner on 172.16.3.120 — copies files directly to Ignition
+  # Waits for dev to complete + approval popup
+  # ─────────────────────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: self-hosted-staging
+    needs: [deploy-dev]
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.target_env == 'staging')
+    environment:
+      name: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts-${{ github.sha }}
+          path: ./artifacts
+
+      - name: Fix Ignition Permissions
+        shell: powershell
+        run: |
+          $path = "C:\Program Files\Inductive Automation\Ignition\data"
+          icacls $path /grant "Administrator:(OI)(CI)F" /T 2>$null | Out-Null
+          Write-Host "Permissions OK"
+
+      - name: Deploy TestProject to Staging
+        shell: cmd
+        run: |
+          echo ==========================================
+          echo Deploying TestProject to Staging...
+          echo ==========================================
+          set DEST=C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject
+          if exist "%DEST%" ( rmdir /S /Q "%DEST%" )
+          xcopy /E /I /Y "artifacts\projects\TestProject" "%DEST%"
+          if not exist "%DEST%\project.json" (
+            echo ERROR: TestProject copy failed!
+            exit /b 1
+          )
+          echo TestProject copied OK!
+          curl -s -X POST -H "X-Ignition-API-Token: %STAGE_GATEWAY_API_KEY%" -H "Content-Type: application/json" "http://localhost:8088/data/api/v1/config/scan"
+          echo TestProject deployed to Staging!
+        env:
+          STAGE_GATEWAY_API_KEY: ${{ secrets.STAGE_GATEWAY_API_KEY }}
+
+      - name: Deploy FactoryDashboard to Staging
+        shell: cmd
+        run: |
+          echo Deploying FactoryDashboard to Staging...
+          set DEST=C:\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard
+          if exist "%DEST%" ( rmdir /S /Q "%DEST%" )
+          xcopy /E /I /Y "artifacts\projects\FactoryDashboard" "%DEST%"
+          if not exist "%DEST%\project.json" (
+            echo ERROR: FactoryDashboard copy failed!
+            exit /b 1
+          )
+          echo FactoryDashboard copied OK!
+          curl -s -X POST -H "X-Ignition-API-Token: %STAGE_GATEWAY_API_KEY%" -H "Content-Type: application/json" "http://localhost:8088/data/api/v1/config/scan"
+          echo FactoryDashboard deployed to Staging!
+        env:
+          STAGE_GATEWAY_API_KEY: ${{ secrets.STAGE_GATEWAY_API_KEY }}
+
+      - name: Verify Staging Deployment
+        shell: cmd
+        run: |
+          echo ==========================================
+          echo Verifying Staging deployment...
+          if exist "C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject\project.json" (
+            echo [OK] TestProject deployed to Staging
+          ) else ( echo [FAIL] TestProject missing on Staging! )
+          if exist "C:\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard\project.json" (
+            echo [OK] FactoryDashboard deployed to Staging
+          ) else ( echo [FAIL] FactoryDashboard missing on Staging! )
+          echo Staging URL: http://172.16.3.120:8088/web/home
+          echo ==========================================
