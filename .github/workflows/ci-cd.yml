@@ -189,7 +189,7 @@ jobs:
   # ───────────────────────────────────────────────────────────
   deploy-staging:
     name: Deploy FactoryDashboard to Staging
-    runs-on: self-hosted-staging
+    runs-on: self-hosted
     needs: [build, test-pylib]
     if: |
       (startsWith(github.ref, 'refs/heads/release/') && github.event_name == 'push') ||
