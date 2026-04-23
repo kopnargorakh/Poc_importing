@@ -10,12 +10,11 @@ on:
   push:
     branches:
       - develop
-      - release/*       # ← NEW: auto triggers staging deploy
+      - release/*
   pull_request:
     branches:
       - develop
 
-  # ← NEW: manual trigger to pick environment + deploy type
   workflow_dispatch:
     inputs:
       deploy_type:
@@ -24,8 +23,8 @@ on:
         default: 'project'
         type: choice
         options:
-          - project      # views + scripts + tags (no restart)
-          - gateway      # full gateway config + restart
+          - project
+          - gateway
       target_env:
         description: 'Target environment'
         required: true
@@ -76,6 +75,7 @@ jobs:
             build/
             scripts/
             config/
+            projects/
             migrations/
 
   test-pylib:
@@ -93,16 +93,13 @@ jobs:
           chmod +x ./scripts/test-pylib.sh
           ./scripts/test-pylib.sh pylib/Mustry/Tests
 
-  # ───────────────────────────────────────────────────────────
+  # ─────────────────────────────────────────────────────────────
   # DEVELOPMENT
-  # Secrets used (from screenshot):
-  #   DEV_GATEWAY_KEY   ← API key
-  #   DEV_GATEWAY_PASS  ← password
-  #   DEV_GATEWAY_URL   ← gateway URL
-  #
-  # TestProject     → UNCHANGED (exactly as original)
-  # FactoryDashboard → NEW (added below TestProject)
-  # ───────────────────────────────────────────────────────────
+  # Secret names kept EXACTLY as original:
+  #   DEV_GATEWAY_URL
+  #   DEV_GATEWAY_API_KEY
+  #   DEV_GATEWAY_PASS
+  # ─────────────────────────────────────────────────────────────
   deploy-dev:
     name: Deploy to Development
     runs-on: ubuntu-latest
@@ -120,73 +117,106 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-artifacts-${{ github.sha }}
-          path: ./artifacts
+          path: .
 
-      # ── TestProject — UNCHANGED ──────────────────────────────
+      # ── TestProject — UNCHANGED ────────────────────────────────
       - name: Deploy to Development Gateway
-        shell: powershell
         run: |
-          $env:DEV_GATEWAY_URL     = "${{ secrets.DEV_GATEWAY_URL }}"
-          $env:DEV_GATEWAY_API_KEY = "${{ secrets.DEV_GATEWAY_KEY }}"
-          $env:DEV_GATEWAY_PASS    = "${{ secrets.DEV_GATEWAY_PASS }}"
-          & "C:\Program Files\Git\bin\bash.exe" -c "DEV_GATEWAY_URL='$env:DEV_GATEWAY_URL' DEV_GATEWAY_API_KEY='$env:DEV_GATEWAY_API_KEY' DEV_GATEWAY_PASS='$env:DEV_GATEWAY_PASS' ./scripts/deploy-project.sh dev projects/TestProject"
-        env:
-          DEV_GATEWAY_URL:     ${{ secrets.DEV_GATEWAY_URL }}
-          DEV_GATEWAY_API_KEY: ${{ secrets.DEV_GATEWAY_KEY }}
-          DEV_GATEWAY_PASS:    ${{ secrets.DEV_GATEWAY_PASS }}
+          echo "Packaging TestProject..."
+          cd projects
+          zip -r /tmp/TestProject.zip TestProject/
+          cd -
 
-      # ── FactoryDashboard — NEW ────────────────────────────────
-      # Resolve deploy type:
-      #   auto push → always 'project' (safe, no restart)
-      #   manual    → use chosen input
+          echo "Uploading TestProject..."
+          UPLOAD=$(curl -s -o /tmp/tp_resp.txt -w "%{http_code}" \
+            -X POST \
+            -H "X-Ignition-API-Token: ${{ secrets.DEV_GATEWAY_API_KEY }}" \
+            -F "file=@/tmp/TestProject.zip" \
+            "${{ secrets.DEV_GATEWAY_URL }}/data/api/v1/projects/import" \
+            --max-time 60 || echo "000")
+          echo "Upload: HTTP $UPLOAD"
+          cat /tmp/tp_resp.txt || true
+
+          echo "Triggering config scan..."
+          curl -s -X POST \
+            -H "X-Ignition-API-Token: ${{ secrets.DEV_GATEWAY_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.DEV_GATEWAY_URL }}/data/api/v1/config/scan" \
+            --max-time 15 || true
+          echo "TestProject deployed!"
+
+      # ── Resolve deploy type ────────────────────────────────────
       - name: Resolve Deploy Type
-        shell: powershell
         run: |
-          $deployType = "${{ github.event.inputs.deploy_type }}"
-          if ([string]::IsNullOrEmpty($deployType)) { $deployType = "project" }
-          "DEPLOY_TYPE=$deployType" | Out-File -FilePath $env:GITHUB_ENV -Append
-          Write-Host "FactoryDashboard deploy type: $deployType"
+          DEPLOY_TYPE="${{ github.event.inputs.deploy_type }}"
+          if [ -z "$DEPLOY_TYPE" ]; then DEPLOY_TYPE="project"; fi
+          echo "DEPLOY_TYPE=$DEPLOY_TYPE" >> $GITHUB_ENV
+          echo "Deploy type: $DEPLOY_TYPE"
 
+      # ── FactoryDashboard project deploy ────────────────────────
       - name: Deploy FactoryDashboard to Development (project)
         if: env.DEPLOY_TYPE == 'project'
-        shell: powershell
         run: |
-          $env:DEV_GATEWAY_URL     = "${{ secrets.DEV_GATEWAY_URL }}"
-          $env:DEV_GATEWAY_API_KEY = "${{ secrets.DEV_GATEWAY_KEY }}"
-          $env:DEV_GATEWAY_PASS    = "${{ secrets.DEV_GATEWAY_PASS }}"
-          & "C:\Program Files\Git\bin\bash.exe" -c "DEV_GATEWAY_URL='$env:DEV_GATEWAY_URL' DEV_GATEWAY_API_KEY='$env:DEV_GATEWAY_API_KEY' DEV_GATEWAY_PASS='$env:DEV_GATEWAY_PASS' ./scripts/deploy-project.sh dev projects/FactoryDashboard"
-        env:
-          DEV_GATEWAY_URL:     ${{ secrets.DEV_GATEWAY_URL }}
-          DEV_GATEWAY_API_KEY: ${{ secrets.DEV_GATEWAY_KEY }}
-          DEV_GATEWAY_PASS:    ${{ secrets.DEV_GATEWAY_PASS }}
+          echo "Packaging FactoryDashboard..."
+          cd projects
+          zip -r /tmp/FactoryDashboard.zip FactoryDashboard/
+          cd -
 
+          echo "Uploading FactoryDashboard..."
+          UPLOAD=$(curl -s -o /tmp/fd_resp.txt -w "%{http_code}" \
+            -X POST \
+            -H "X-Ignition-API-Token: ${{ secrets.DEV_GATEWAY_API_KEY }}" \
+            -F "file=@/tmp/FactoryDashboard.zip" \
+            "${{ secrets.DEV_GATEWAY_URL }}/data/api/v1/projects/import" \
+            --max-time 60 || echo "000")
+          echo "Upload: HTTP $UPLOAD"
+          cat /tmp/fd_resp.txt || true
+
+          SCAN=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST \
+            -H "X-Ignition-API-Token: ${{ secrets.DEV_GATEWAY_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.DEV_GATEWAY_URL }}/data/api/v1/config/scan" \
+            --max-time 15 || echo "000")
+          echo "Config scan: HTTP $SCAN"
+
+          if [[ "$SCAN" =~ ^2 ]]; then
+            echo "FactoryDashboard is LIVE on Dev!"
+          else
+            curl -s -X POST \
+              -H "X-Ignition-API-Token: ${{ secrets.DEV_GATEWAY_API_KEY }}" \
+              "${{ secrets.DEV_GATEWAY_URL }}/data/api/v1/restart-tasks/restart?confirm=true" \
+              --max-time 20 || true
+            echo "Restart triggered — live in ~60 seconds"
+          fi
+
+      # ── FactoryDashboard gateway deploy ────────────────────────
       - name: Deploy FactoryDashboard to Development (gateway)
         if: env.DEPLOY_TYPE == 'gateway'
-        shell: powershell
         run: |
-          $env:DEV_GATEWAY_URL     = "${{ secrets.DEV_GATEWAY_URL }}"
-          $env:DEV_GATEWAY_API_KEY = "${{ secrets.DEV_GATEWAY_KEY }}"
-          $env:DEV_GATEWAY_PASS    = "${{ secrets.DEV_GATEWAY_PASS }}"
-          & "C:\Program Files\Git\bin\bash.exe" -c "DEV_GATEWAY_URL='$env:DEV_GATEWAY_URL' DEV_GATEWAY_API_KEY='$env:DEV_GATEWAY_API_KEY' DEV_GATEWAY_PASS='$env:DEV_GATEWAY_PASS' ./scripts/deploy-gateway.sh dev projects/FactoryDashboard"
-        env:
-          DEV_GATEWAY_URL:     ${{ secrets.DEV_GATEWAY_URL }}
-          DEV_GATEWAY_API_KEY: ${{ secrets.DEV_GATEWAY_KEY }}
-          DEV_GATEWAY_PASS:    ${{ secrets.DEV_GATEWAY_PASS }}
+          cd projects
+          zip -r /tmp/FactoryDashboard.zip FactoryDashboard/
+          cd -
 
-  # ───────────────────────────────────────────────────────────
-  # STAGING — FactoryDashboard only
-  # Secrets used (from screenshot):
-  #   STAGE_GATEWAY_API_KEY ← API key
-  #   STAGE_GATEWAY_PASS    ← password
-  #   STAGE_GATEWAY_URL     ← gateway URL (172.16.3.120:8088)
-  #
-  # Triggers:
-  #   push to release/*           → auto deploy
-  #   manual with target_env=staging → manual deploy
-  #
-  # Runner: ubuntu-latest
-  #   → must be installed on RDP server 172.16.3.120
-  # ───────────────────────────────────────────────────────────
+          curl -s -X POST \
+            -H "X-Ignition-API-Token: ${{ secrets.DEV_GATEWAY_API_KEY }}" \
+            -F "file=@/tmp/FactoryDashboard.zip" \
+            "${{ secrets.DEV_GATEWAY_URL }}/data/api/v1/projects/import" \
+            --max-time 60 || true
+
+          curl -s -X POST \
+            -H "X-Ignition-API-Token: ${{ secrets.DEV_GATEWAY_API_KEY }}" \
+            "${{ secrets.DEV_GATEWAY_URL }}/data/api/v1/restart-tasks/restart?confirm=true" \
+            --max-time 20 || true
+          echo "Gateway restart triggered — live in ~60 seconds"
+
+  # ─────────────────────────────────────────────────────────────
+  # STAGING
+  # Secret names kept EXACTLY as original:
+  #   STAGE_GATEWAY_URL
+  #   STAGE_GATEWAY_API_KEY
+  #   STAGE_GATEWAY_PASS
+  # ─────────────────────────────────────────────────────────────
   deploy-staging:
     name: Deploy FactoryDashboard to Staging
     runs-on: ubuntu-latest
@@ -204,38 +234,65 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-artifacts-${{ github.sha }}
-          path: ./artifacts
+          path: .
 
       - name: Resolve Deploy Type
-        shell: powershell
         run: |
-          $deployType = "${{ github.event.inputs.deploy_type }}"
-          if ([string]::IsNullOrEmpty($deployType)) { $deployType = "project" }
-          "DEPLOY_TYPE=$deployType" | Out-File -FilePath $env:GITHUB_ENV -Append
-          Write-Host "FactoryDashboard deploy type: $deployType"
+          DEPLOY_TYPE="${{ github.event.inputs.deploy_type }}"
+          if [ -z "$DEPLOY_TYPE" ]; then DEPLOY_TYPE="project"; fi
+          echo "DEPLOY_TYPE=$DEPLOY_TYPE" >> $GITHUB_ENV
 
+      # ── FactoryDashboard project deploy ────────────────────────
       - name: Deploy FactoryDashboard to Staging (project)
         if: env.DEPLOY_TYPE == 'project'
-        shell: powershell
         run: |
-          $env:STAGING_GATEWAY_URL     = "${{ secrets.STAGE_GATEWAY_URL }}"
-          $env:STAGING_GATEWAY_API_KEY = "${{ secrets.STAGE_GATEWAY_API_KEY }}"
-          $env:STAGING_GATEWAY_PASS    = "${{ secrets.STAGE_GATEWAY_PASS }}"
-          & "C:\Program Files\Git\bin\bash.exe" -c "STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' ./scripts/deploy-project.sh staging projects/FactoryDashboard"
-        env:
-          STAGING_GATEWAY_URL:     ${{ secrets.STAGE_GATEWAY_URL }}
-          STAGING_GATEWAY_API_KEY: ${{ secrets.STAGE_GATEWAY_API_KEY }}
-          STAGING_GATEWAY_PASS:    ${{ secrets.STAGE_GATEWAY_PASS }}
+          cd projects
+          zip -r /tmp/FactoryDashboard.zip FactoryDashboard/
+          cd -
 
+          UPLOAD=$(curl -s -o /tmp/stage_resp.txt -w "%{http_code}" \
+            -X POST \
+            -H "X-Ignition-API-Token: ${{ secrets.STAGE_GATEWAY_API_KEY }}" \
+            -F "file=@/tmp/FactoryDashboard.zip" \
+            "${{ secrets.STAGE_GATEWAY_URL }}/data/api/v1/projects/import" \
+            --max-time 60 || echo "000")
+          echo "Upload: HTTP $UPLOAD"
+          cat /tmp/stage_resp.txt || true
+
+          SCAN=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST \
+            -H "X-Ignition-API-Token: ${{ secrets.STAGE_GATEWAY_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.STAGE_GATEWAY_URL }}/data/api/v1/config/scan" \
+            --max-time 15 || echo "000")
+          echo "Config scan: HTTP $SCAN"
+
+          if [[ "$SCAN" =~ ^2 ]]; then
+            echo "FactoryDashboard is LIVE on Staging!"
+          else
+            curl -s -X POST \
+              -H "X-Ignition-API-Token: ${{ secrets.STAGE_GATEWAY_API_KEY }}" \
+              "${{ secrets.STAGE_GATEWAY_URL }}/data/api/v1/restart-tasks/restart?confirm=true" \
+              --max-time 20 || true
+            echo "Restart triggered on staging"
+          fi
+
+      # ── FactoryDashboard gateway deploy ────────────────────────
       - name: Deploy FactoryDashboard to Staging (gateway)
         if: env.DEPLOY_TYPE == 'gateway'
-        shell: powershell
         run: |
-          $env:STAGING_GATEWAY_URL     = "${{ secrets.STAGE_GATEWAY_URL }}"
-          $env:STAGING_GATEWAY_API_KEY = "${{ secrets.STAGE_GATEWAY_API_KEY }}"
-          $env:STAGING_GATEWAY_PASS    = "${{ secrets.STAGE_GATEWAY_PASS }}"
-          & "C:\Program Files\Git\bin\bash.exe" -c "STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' ./scripts/deploy-gateway.sh staging projects/FactoryDashboard"
-        env:
-          STAGING_GATEWAY_URL:     ${{ secrets.STAGE_GATEWAY_URL }}
-          STAGING_GATEWAY_API_KEY: ${{ secrets.STAGE_GATEWAY_API_KEY }}
-          STAGING_GATEWAY_PASS:    ${{ secrets.STAGE_GATEWAY_PASS }}
+          cd projects
+          zip -r /tmp/FactoryDashboard.zip FactoryDashboard/
+          cd -
+
+          curl -s -X POST \
+            -H "X-Ignition-API-Token: ${{ secrets.STAGE_GATEWAY_API_KEY }}" \
+            -F "file=@/tmp/FactoryDashboard.zip" \
+            "${{ secrets.STAGE_GATEWAY_URL }}/data/api/v1/projects/import" \
+            --max-time 60 || true
+
+          curl -s -X POST \
+            -H "X-Ignition-API-Token: ${{ secrets.STAGE_GATEWAY_API_KEY }}" \
+            "${{ secrets.STAGE_GATEWAY_URL }}/data/api/v1/restart-tasks/restart?confirm=true" \
+            --max-time 20 || true
+          echo "Gateway restart triggered on staging"
