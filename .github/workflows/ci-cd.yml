@@ -105,7 +105,7 @@ jobs:
   # ───────────────────────────────────────────────────────────
   deploy-dev:
     name: Deploy to Development
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: [build, test-pylib]
     if: |
       (github.ref == 'refs/heads/develop' && github.event_name == 'push') ||
@@ -184,12 +184,12 @@ jobs:
   #   push to release/*           → auto deploy
   #   manual with target_env=staging → manual deploy
   #
-  # Runner: self-hosted-staging
+  # Runner: ubuntu-latest
   #   → must be installed on RDP server 172.16.3.120
   # ───────────────────────────────────────────────────────────
   deploy-staging:
     name: Deploy FactoryDashboard to Staging
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: [build, test-pylib]
     if: |
       (startsWith(github.ref, 'refs/heads/release/') && github.event_name == 'push') ||
