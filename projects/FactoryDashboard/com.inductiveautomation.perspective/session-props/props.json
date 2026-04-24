@@ -39,7 +39,7 @@
     },
     "props.host": {
       "access": "SYSTEM",
-      "persistent": false
+      "persistent": true
     },
     "props.id": {
       "access": "SYSTEM",
