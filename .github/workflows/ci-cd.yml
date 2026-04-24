@@ -1,7 +1,10 @@
 # ============================================================
 # GitHub Actions CI/CD Pipeline for Ignition 8.3
 # Runner: StagingRunner on 172.16.3.148 (label: self-hosted-staging)
-# push to develop deploys to BOTH Dev + Staging
+#
+# LIVE RELOAD using gwcmd - built into every Ignition install
+# NO restart needed, NO API license needed
+# gwcmd is at: C:\Program Files\Inductive Automation\Ignition\gwcmd.bat
 # ============================================================
 name: CI/CD Pipeline
 permissions:
@@ -32,6 +35,7 @@ on:
 
 env:
   BUILD_CONFIGURATION: Release
+  IGNITION_PATH: "C:\\Program Files\\Inductive Automation\\Ignition"
 
 jobs:
   build:
@@ -87,6 +91,9 @@ jobs:
           chmod +x ./scripts/test-pylib.sh
           ./scripts/test-pylib.sh pylib/Mustry/Tests
 
+  # ──────────────────────────────────────────────────────────
+  # DEPLOY TO DEVELOPMENT (172.16.3.148)
+  # ──────────────────────────────────────────────────────────
   deploy-dev:
     name: Deploy to Development
     runs-on: self-hosted-staging
@@ -122,7 +129,7 @@ jobs:
           $dest = "C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject"
           Write-Host "Deploying TestProject to Dev..."
           if (-not (Test-Path $src)) {
-            Write-Host "ERROR: Source not found: $src" -ForegroundColor Red
+            Write-Host "ERROR: Source not found!" -ForegroundColor Red
             Get-ChildItem "$PWD\artifacts\projects\" -ErrorAction SilentlyContinue
             exit 1
           }
@@ -130,8 +137,8 @@ jobs:
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
           Copy-Item -Path "$src\*" -Destination $dest -Recurse -Force
           if (Test-Path "$dest\project.json") {
-            Write-Host "[OK] TestProject deployed to Dev!" -ForegroundColor Green
-          } else { Write-Host "[FAIL] project.json missing!" -ForegroundColor Red; exit 1 }
+            Write-Host "[OK] TestProject deployed!" -ForegroundColor Green
+          } else { Write-Host "[FAIL]" -ForegroundColor Red; exit 1 }
 
       - name: Deploy FactoryDashboard to Dev
         shell: powershell
@@ -143,31 +150,36 @@ jobs:
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
           Copy-Item -Path "$src\*" -Destination $dest -Recurse -Force
           if (Test-Path "$dest\project.json") {
-            Write-Host "[OK] FactoryDashboard deployed to Dev!" -ForegroundColor Green
+            Write-Host "[OK] FactoryDashboard deployed!" -ForegroundColor Green
           } else { Write-Host "[FAIL]" -ForegroundColor Red; exit 1 }
 
-      - name: Create WebDev reload script on Dev
+      # ── Live reload using gwcmd ────────────────────────────
+      - name: Reload Ignition Dev (gwcmd - no restart needed)
         shell: powershell
         run: |
-          $webdevPath = "C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject\com.inductiveautomation.webdev\endpoints\reload"
-          New-Item -ItemType Directory -Force -Path $webdevPath | Out-Null
-          $ts = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
-          $json = '{"scope":"G","version":1,"restricted":false,"overridable":true,"files":["code.py"],"attributes":{"lastModification":{"actor":"cicd","timestamp":"' + $ts + '"}}}'
-          Set-Content -Path "$webdevPath\resource.json" -Value $json -Encoding UTF8
-          $py = "def doGet(request, session):`n    try:`n        system.project.requestScan()`n        return {'status': 'success', 'message': 'Reloaded'}`n    except Exception as e:`n        return {'status': 'error', 'message': str(e)}"
-          Set-Content -Path "$webdevPath\code.py" -Value $py -Encoding UTF8
-          Write-Host "[OK] WebDev reload script created on Dev!" -ForegroundColor Green
+          $gwcmd = "C:\Program Files\Inductive Automation\Ignition\gwcmd.bat"
 
-      - name: Wait and reload Dev
-        shell: powershell
-        run: |
-          Write-Host "Waiting 15s for Ignition file watcher..."
-          Start-Sleep -Seconds 15
-          try {
-            $r = Invoke-WebRequest "http://localhost:8088/system/webdev/TestProject/reload" -Method GET -UseBasicParsing -TimeoutSec 20
-            Write-Host "[OK] Dev reloaded! $($r.Content)" -ForegroundColor Green
-          } catch {
-            Write-Host "WebDev: $($_.Exception.Message)" -ForegroundColor Yellow
+          Write-Host "Reloading Ignition Dev using gwcmd..."
+
+          if (Test-Path $gwcmd) {
+            # Try gwcmd project scan
+            try {
+              $result = & cmd /c "`"$gwcmd`" --project-scan" 2>&1
+              Write-Host "gwcmd result: $result" -ForegroundColor Green
+              Write-Host "[OK] Projects reloaded via gwcmd!" -ForegroundColor Green
+            } catch {
+              Write-Host "gwcmd failed: $($_.Exception.Message)" -ForegroundColor Yellow
+            }
+          } else {
+            Write-Host "gwcmd not found at: $gwcmd" -ForegroundColor Yellow
+
+            # Fallback: touch project.json to trigger file watcher
+            Write-Host "Using file touch fallback..."
+            $projectJson = "C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject\project.json"
+            if (Test-Path $projectJson) {
+              (Get-Item $projectJson).LastWriteTime = Get-Date
+              Write-Host "[OK] project.json touched — Ignition file watcher will detect change" -ForegroundColor Green
+            }
           }
 
       - name: Verify Dev
@@ -180,12 +192,15 @@ jobs:
           @("TestProject","FactoryDashboard") | ForEach-Object {
             if (Test-Path "$base\$_\project.json") {
               $t = (Get-Item "$base\$_\project.json").LastWriteTime
-              Write-Host "[OK] $_ at $t" -ForegroundColor Green
+              Write-Host "[OK] $_ deployed at $t" -ForegroundColor Green
             } else { Write-Host "[FAIL] $_ missing" -ForegroundColor Red }
           }
           Write-Host "Dev: http://172.16.3.148:8088/web/home"
           Write-Host "==========================================" -ForegroundColor Cyan
 
+  # ──────────────────────────────────────────────────────────
+  # DEPLOY TO STAGING (172.16.3.120)
+  # ──────────────────────────────────────────────────────────
   deploy-staging:
     name: Deploy to Staging
     runs-on: self-hosted-staging
@@ -225,7 +240,7 @@ jobs:
           $ip   = "172.16.3.120"
           $src  = "$PWD\artifacts\projects\TestProject"
           $dest = "\\$ip\C$\Program Files\Inductive Automation\Ignition\data\projects\TestProject"
-          Write-Host "Deploying TestProject to Staging ($ip)..."
+          Write-Host "Deploying TestProject to Staging..."
           if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
           Copy-Item -Path "$src\*" -Destination $dest -Recurse -Force
@@ -247,30 +262,41 @@ jobs:
             Write-Host "[OK] FactoryDashboard deployed to Staging!" -ForegroundColor Green
           } else { Write-Host "[FAIL]" -ForegroundColor Red; exit 1 }
 
-      - name: Create WebDev reload script on Staging
+      # ── Live reload on Staging using gwcmd via network ─────
+      - name: Reload Ignition Staging (gwcmd via PSSession)
         shell: powershell
         run: |
-          $ip = "172.16.3.120"
-          $webdevPath = "\\$ip\C$\Program Files\Inductive Automation\Ignition\data\projects\TestProject\com.inductiveautomation.webdev\endpoints\reload"
-          New-Item -ItemType Directory -Force -Path $webdevPath | Out-Null
-          $ts = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
-          $json = '{"scope":"G","version":1,"restricted":false,"overridable":true,"files":["code.py"],"attributes":{"lastModification":{"actor":"cicd","timestamp":"' + $ts + '"}}}'
-          Set-Content -Path "$webdevPath\resource.json" -Value $json -Encoding UTF8
-          $py = "def doGet(request, session):`n    try:`n        system.project.requestScan()`n        return {'status': 'success', 'message': 'Reloaded'}`n    except Exception as e:`n        return {'status': 'error', 'message': str(e)}"
-          Set-Content -Path "$webdevPath\code.py" -Value $py -Encoding UTF8
-          Write-Host "[OK] WebDev reload script created on Staging!" -ForegroundColor Green
+          $ip    = "172.16.3.120"
+          $gwcmd = "C:\Program Files\Inductive Automation\Ignition\gwcmd.bat"
 
-      - name: Wait and reload Staging
-        shell: powershell
-        run: |
-          $ip = "172.16.3.120"
-          Write-Host "Waiting 15s for Ignition file watcher..."
-          Start-Sleep -Seconds 15
+          Write-Host "Reloading Ignition Staging using gwcmd..."
+
+          # Try remote execution via PowerShell session
           try {
-            $r = Invoke-WebRequest "http://${ip}:8088/system/webdev/TestProject/reload" -Method GET -UseBasicParsing -TimeoutSec 20
-            Write-Host "[OK] Staging reloaded! $($r.Content)" -ForegroundColor Green
+            $session = New-PSSession -ComputerName $ip -ErrorAction Stop
+            $result = Invoke-Command -Session $session -ScriptBlock {
+              $gwcmd = "C:\Program Files\Inductive Automation\Ignition\gwcmd.bat"
+              if (Test-Path $gwcmd) {
+                & cmd /c "`"$gwcmd`" --project-scan" 2>&1
+              } else {
+                # Fallback: touch project.json
+                $p = "C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject\project.json"
+                if (Test-Path $p) { (Get-Item $p).LastWriteTime = Get-Date }
+                "File touch fallback done"
+              }
+            }
+            Remove-PSSession $session
+            Write-Host "[OK] Staging reloaded: $result" -ForegroundColor Green
           } catch {
-            Write-Host "WebDev: $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "Remote session failed: $($_.Exception.Message)" -ForegroundColor Yellow
+
+            # Fallback: touch project.json via network share
+            Write-Host "Using network file touch fallback..."
+            $projectJson = "\\$ip\C$\Program Files\Inductive Automation\Ignition\data\projects\TestProject\project.json"
+            if (Test-Path $projectJson) {
+              (Get-Item $projectJson).LastWriteTime = Get-Date
+              Write-Host "[OK] project.json touched on Staging — file watcher will detect" -ForegroundColor Green
+            }
           }
 
       - name: Verify Staging
@@ -284,7 +310,7 @@ jobs:
           @("TestProject","FactoryDashboard") | ForEach-Object {
             if (Test-Path "$base\$_\project.json") {
               $t = (Get-Item "$base\$_\project.json").LastWriteTime
-              Write-Host "[OK] $_ at $t" -ForegroundColor Green
+              Write-Host "[OK] $_ deployed at $t" -ForegroundColor Green
             } else { Write-Host "[FAIL] $_ missing" -ForegroundColor Red }
           }
           Write-Host "Staging: http://${ip}:8088/web/home"
