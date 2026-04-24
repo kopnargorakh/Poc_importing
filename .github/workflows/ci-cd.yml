@@ -3,8 +3,14 @@
 # Runner: StagingRunner on 172.16.3.148 (label: self-hosted-staging)
 #
 # FLOW:
-#   push to develop → Deploy to Dev AND Staging (both automatic)
+#   push to develop → deploys to BOTH Dev + Staging
 #   manual → choose dev, staging, or both
+#
+# Secrets:
+#   DEV_GATEWAY_KEY       ← Dev API token
+#   DEV_GATEWAY_PASS      ← Dev password
+#   STAGE_GATEWAY_API_KEY ← Staging API token
+#   STAGE_GATEWAY_PASS    ← Staging password
 # ============================================================
 name: CI/CD Pipeline
 permissions:
@@ -16,7 +22,7 @@ concurrency:
 on:
   push:
     branches:
-      - develop
+      - develop        # → deploys to BOTH dev and staging
   pull_request:
     branches:
       - develop
@@ -94,7 +100,7 @@ jobs:
           ./scripts/test-pylib.sh pylib/Mustry/Tests
 
   # ──────────────────────────────────────────────────────────
-  # DEPLOY TO DEVELOPMENT
+  # DEPLOY TO DEVELOPMENT (172.16.3.148)
   # Triggers: push to develop OR manual dev/both
   # ──────────────────────────────────────────────────────────
   deploy-dev:
@@ -113,6 +119,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
         with:
@@ -131,28 +138,20 @@ jobs:
           $src  = "$PWD\artifacts\projects\TestProject"
           $dest = "C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject"
           Write-Host "=========================================="
-          Write-Host " Deploying TestProject → Dev (local)"
+          Write-Host " Deploying TestProject → Dev"
           Write-Host "=========================================="
-          if (-not (Test-Path $src)) { Write-Host "ERROR: Source not found!" -ForegroundColor Red; exit 1 }
+          if (-not (Test-Path $src)) {
+            Write-Host "ERROR: Source not found: $src" -ForegroundColor Red
+            Get-ChildItem "$PWD\artifacts\projects\" -ErrorAction SilentlyContinue
+            exit 1
+          }
           if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
           Copy-Item -Path "$src\*" -Destination $dest -Recurse -Force
           if (Test-Path "$dest\project.json") {
-            Write-Host "[OK] TestProject deployed to Dev!" -ForegroundColor Green
+            Write-Host "[OK] TestProject deployed!" -ForegroundColor Green
+            Get-ChildItem $dest | Select-Object Name, LastWriteTime
           } else { Write-Host "[FAIL]" -ForegroundColor Red; exit 1 }
-          try {
-            Invoke-WebRequest -Uri "http://localhost:8088/data/api/v1/config/scan" `
-              -Method POST `
-              -Headers @{ "X-Ignition-API-Token" = "${{ secrets.DEV_GATEWAY_KEY }}"; "Content-Type" = "application/json" } `
-              -UseBasicParsing -TimeoutSec 15 | Out-Null
-            Write-Host "[OK] Config scan triggered!" -ForegroundColor Green
-          } catch {
-            try {
-              Invoke-WebRequest -Uri "http://localhost:8088/data/api/v1/restart-tasks/restart?confirm=true" `
-                -Method POST -Headers @{ "X-Ignition-API-Token" = "${{ secrets.DEV_GATEWAY_KEY }}" } `
-                -UseBasicParsing -TimeoutSec 20 | Out-Null
-            } catch { Write-Host "Restart failed" -ForegroundColor Yellow }
-          }
 
       - name: Deploy FactoryDashboard to Dev
         shell: powershell
@@ -166,37 +165,76 @@ jobs:
           if (Test-Path "$dest\project.json") {
             Write-Host "[OK] FactoryDashboard deployed!" -ForegroundColor Green
           } else { Write-Host "[FAIL]" -ForegroundColor Red; exit 1 }
+
+      - name: Create WebDev reload script on Dev
+        shell: powershell
+        run: |
+          $webdevPath = "C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject\com.inductiveautomation.webdev\endpoints\reload"
+          New-Item -ItemType Directory -Force -Path $webdevPath | Out-Null
+          $timestamp = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ss") + "Z"
+          @"
+{
+  "scope": "G",
+  "version": 1,
+  "restricted": false,
+  "overridable": true,
+  "files": ["code.py"],
+  "attributes": {
+    "lastModification": {
+      "actor": "cicd-pipeline",
+      "timestamp": "$timestamp"
+    }
+  }
+}
+"@ | Out-File -FilePath "$webdevPath\resource.json" -Encoding UTF8
+          @'
+def doGet(request, session):
+    try:
+        system.project.requestScan()
+        return {"status": "success", "message": "Project reloaded"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+'@ | Out-File -FilePath "$webdevPath\code.py" -Encoding UTF8
+          Write-Host "[OK] WebDev reload script created on Dev!" -ForegroundColor Green
+
+      - name: Wait and reload Dev
+        shell: powershell
+        run: |
+          Write-Host "Waiting 15s for Ignition file watcher..."
+          Start-Sleep -Seconds 15
           try {
-            Invoke-WebRequest -Uri "http://localhost:8088/data/api/v1/config/scan" `
-              -Method POST `
-              -Headers @{ "X-Ignition-API-Token" = "${{ secrets.DEV_GATEWAY_KEY }}"; "Content-Type" = "application/json" } `
-              -UseBasicParsing -TimeoutSec 15 | Out-Null
-            Write-Host "[OK] Config scan triggered!" -ForegroundColor Green
-          } catch { Write-Host "Scan failed" -ForegroundColor Yellow }
+            $r = Invoke-WebRequest "http://localhost:8088/system/webdev/TestProject/reload" `
+              -Method GET -UseBasicParsing -TimeoutSec 20
+            Write-Host "[OK] Dev reloaded: $($r.Content)" -ForegroundColor Green
+          } catch {
+            Write-Host "WebDev reload: $($_.Exception.Message)" -ForegroundColor Yellow
+          }
 
       - name: Verify Dev
         shell: powershell
         run: |
           $base = "C:\Program Files\Inductive Automation\Ignition\data\projects"
           Write-Host "==========================================" -ForegroundColor Cyan
-          Write-Host " Dev Deployment Done!" -ForegroundColor Cyan
+          Write-Host " Dev Deployment Complete!" -ForegroundColor Cyan
+          Write-Host "==========================================" -ForegroundColor Cyan
           @("TestProject","FactoryDashboard") | ForEach-Object {
             if (Test-Path "$base\$_\project.json") {
-              Write-Host "[OK] $_ deployed" -ForegroundColor Green
+              $time = (Get-Item "$base\$_\project.json").LastWriteTime
+              Write-Host "[OK] $_ deployed at $time" -ForegroundColor Green
             } else { Write-Host "[FAIL] $_ missing" -ForegroundColor Red }
           }
           Write-Host "Dev: http://172.16.3.148:8088/web/home"
           Write-Host "==========================================" -ForegroundColor Cyan
 
   # ──────────────────────────────────────────────────────────
-  # DEPLOY TO STAGING
+  # DEPLOY TO STAGING (172.16.3.120)
   # Triggers: push to develop OR manual staging/both
-  # Runs in PARALLEL with deploy-dev (no waiting)
+  # Runs in PARALLEL with deploy-dev
   # ──────────────────────────────────────────────────────────
   deploy-staging:
     name: Deploy to Staging
     runs-on: self-hosted-staging
-    needs: [build, test-pylib]    # ← runs in parallel with deploy-dev
+    needs: [build, test-pylib]
     if: |
       (github.ref == 'refs/heads/develop' && github.event_name == 'push') ||
       (github.event_name == 'workflow_dispatch' && (
@@ -209,6 +247,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
         with:
@@ -241,13 +280,6 @@ jobs:
           if (Test-Path "$dest\project.json") {
             Write-Host "[OK] TestProject deployed to Staging!" -ForegroundColor Green
           } else { Write-Host "[FAIL]" -ForegroundColor Red; exit 1 }
-          try {
-            Invoke-WebRequest -Uri "http://${stagingIP}:8088/data/api/v1/config/scan" `
-              -Method POST `
-              -Headers @{ "X-Ignition-API-Token" = "${{ secrets.STAGE_GATEWAY_API_KEY }}"; "Content-Type" = "application/json" } `
-              -UseBasicParsing -TimeoutSec 15 | Out-Null
-            Write-Host "[OK] Config scan on Staging!" -ForegroundColor Green
-          } catch { Write-Host "Scan failed" -ForegroundColor Yellow }
 
       - name: Deploy FactoryDashboard to Staging
         shell: powershell
@@ -262,13 +294,52 @@ jobs:
           if (Test-Path "$dest\project.json") {
             Write-Host "[OK] FactoryDashboard deployed to Staging!" -ForegroundColor Green
           } else { Write-Host "[FAIL]" -ForegroundColor Red; exit 1 }
+
+      - name: Create WebDev reload script on Staging
+        shell: powershell
+        run: |
+          $stagingIP  = "172.16.3.120"
+          $webdevPath = "\\$stagingIP\C$\Program Files\Inductive Automation\Ignition\data\projects\TestProject\com.inductiveautomation.webdev\endpoints\reload"
+          New-Item -ItemType Directory -Force -Path $webdevPath | Out-Null
+          $timestamp = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ss") + "Z"
+          @"
+{
+  "scope": "G",
+  "version": 1,
+  "restricted": false,
+  "overridable": true,
+  "files": ["code.py"],
+  "attributes": {
+    "lastModification": {
+      "actor": "cicd-pipeline",
+      "timestamp": "$timestamp"
+    }
+  }
+}
+"@ | Out-File -FilePath "$webdevPath\resource.json" -Encoding UTF8
+          @'
+def doGet(request, session):
+    try:
+        system.project.requestScan()
+        return {"status": "success", "message": "Project reloaded"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+'@ | Out-File -FilePath "$webdevPath\code.py" -Encoding UTF8
+          Write-Host "[OK] WebDev reload script created on Staging!" -ForegroundColor Green
+
+      - name: Wait and reload Staging
+        shell: powershell
+        run: |
+          $stagingIP = "172.16.3.120"
+          Write-Host "Waiting 15s for Ignition file watcher..."
+          Start-Sleep -Seconds 15
           try {
-            Invoke-WebRequest -Uri "http://${stagingIP}:8088/data/api/v1/config/scan" `
-              -Method POST `
-              -Headers @{ "X-Ignition-API-Token" = "${{ secrets.STAGE_GATEWAY_API_KEY }}"; "Content-Type" = "application/json" } `
-              -UseBasicParsing -TimeoutSec 15 | Out-Null
-            Write-Host "[OK] Config scan triggered!" -ForegroundColor Green
-          } catch { Write-Host "Scan failed" -ForegroundColor Yellow }
+            $r = Invoke-WebRequest "http://${stagingIP}:8088/system/webdev/TestProject/reload" `
+              -Method GET -UseBasicParsing -TimeoutSec 20
+            Write-Host "[OK] Staging reloaded: $($r.Content)" -ForegroundColor Green
+          } catch {
+            Write-Host "WebDev reload: $($_.Exception.Message)" -ForegroundColor Yellow
+          }
 
       - name: Verify Staging
         shell: powershell
@@ -276,11 +347,13 @@ jobs:
           $stagingIP = "172.16.3.120"
           $base = "\\$stagingIP\C$\Program Files\Inductive Automation\Ignition\data\projects"
           Write-Host "==========================================" -ForegroundColor Cyan
-          Write-Host " Staging Deployment Done!" -ForegroundColor Cyan
+          Write-Host " Staging Deployment Complete!" -ForegroundColor Cyan
+          Write-Host "==========================================" -ForegroundColor Cyan
           @("TestProject","FactoryDashboard") | ForEach-Object {
             if (Test-Path "$base\$_\project.json") {
-              Write-Host "[OK] $_ deployed" -ForegroundColor Green
+              $time = (Get-Item "$base\$_\project.json").LastWriteTime
+              Write-Host "[OK] $_ deployed at $time" -ForegroundColor Green
             } else { Write-Host "[FAIL] $_ missing" -ForegroundColor Red }
           }
-          Write-Host "Staging: http://${stagingIP}:8088/web/home"
+          Write-Host "Staging: http://172.16.3.120:8088/web/home"
           Write-Host "==========================================" -ForegroundColor Cyan
