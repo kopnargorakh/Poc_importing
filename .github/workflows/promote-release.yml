@@ -1,119 +1,168 @@
-# GitHub Actions Release Promotion Pipeline
-# This workflow promotes a release from staging to production
-# Trigger: Manual only (workflow_dispatch)
-
+# ============================================================
+# Promote Release Workflow
+# Uses DevRunner on 172.16.3.148
+# Deploys release branch to Staging (172.16.3.120) via network
+# ============================================================
 name: Promote Release
-
-permissions:
-  contents: write
-
-concurrency:
-  group: promote-release-${{ github.ref }}
-  cancel-in-progress: false
 
 on:
   workflow_dispatch:
     inputs:
-      releaseBranch:
-        description: 'Release Branch (e.g., release/1.0.0)'
+      release_branch:
+        description: 'Release branch (e.g. release/1.0.0)'
         required: true
-        default: 'release/1.0.0'
-      releaseTag:
-        description: 'Release Tag (e.g., v1.0.0)'
+        type: string
+      release_version:
+        description: 'Version number (e.g. 1.0.0)'
         required: true
-        default: 'v1.0.0'
-      mergeToMain:
-        description: 'Merge to main after successful deployment'
-        required: true
-        type: boolean
-        default: true
+        type: string
+
+permissions:
+  contents: write
 
 jobs:
   validate:
-    name: Validate Release
+    name: Validate Release Branch
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Validate Branch Exists
+      - name: Validate branch exists
         run: |
-          set -e
-
-          BRANCH="${{ github.event.inputs.releaseBranch }}"
-          TAG="${{ github.event.inputs.releaseTag }}"
-
-          echo "Validating release branch: $BRANCH"
-
-          if ! git rev-parse --verify "origin/$BRANCH" > /dev/null 2>&1; then
-            echo "Error: Branch $BRANCH does not exist"
+          BRANCH="${{ github.event.inputs.release_branch }}"
+          if git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
+            echo "Branch $BRANCH exists!"
+          else
+            echo "ERROR: Branch $BRANCH does not exist!"
             exit 1
           fi
+      - name: Show release info
+        run: |
+          echo "=========================================="
+          echo " Release: ${{ github.event.inputs.release_version }}"
+          echo " Branch:  ${{ github.event.inputs.release_branch }}"
+          echo " Target:  Staging (172.16.3.120)"
+          echo "=========================================="
 
-          echo "✓ Branch $BRANCH exists"
-          echo "Will create tag: $TAG"
-
-  create-tag:
-    name: Create Release Tag
+  build:
+    name: Build Release
     runs-on: ubuntu-latest
-    needs: validate
-
+    needs: [validate]
     steps:
-      - name: Checkout code
+      - name: Checkout release branch
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Configure Git
+          ref: ${{ github.event.inputs.release_branch }}
+      - name: Validate Project Names
         run: |
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
-
-      - name: Create and Push Tag
+          chmod +x ./scripts/validate-names.sh
+          ./scripts/validate-names.sh ./projects
+      - name: Package All Projects
         run: |
           set -e
+          mkdir -p build/
+          chmod +x ./scripts/package-project.sh
+          for dir in projects/*/; do
+            if [ -d "$dir" ]; then
+              echo "Packaging $(basename $dir)..."
+              ./scripts/package-project.sh "$dir"
+            fi
+          done
+          ls -lh build/
+      - name: Upload Release Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts-${{ github.event.inputs.release_version }}
+          if-no-files-found: error
+          path: |
+            build/
+            scripts/
+            config/
+            projects/
+            migrations/
 
-          BRANCH="${{ github.event.inputs.releaseBranch }}"
-          TAG="${{ github.event.inputs.releaseTag }}"
-
-          echo "Creating tag $TAG on branch $BRANCH"
-          git checkout "$BRANCH"
-          git tag -a "$TAG" -m "Release $TAG"
-          git push origin "$TAG"
-
-          echo "✓ Tag $TAG created and pushed"
-
-  merge-to-main:
-    name: Merge to Main
-    runs-on: ubuntu-latest
-    needs: create-tag
-    if: github.event.inputs.mergeToMain == 'true'
-
+  deploy-staging:
+    name: Deploy Release to Staging
+    runs-on: self-hosted
+    needs: [build]
+    environment:
+      name: staging
     steps:
-      - name: Checkout code
+      - name: Checkout release branch
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.event.inputs.release_branch }}
+      - name: Download Release Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts-${{ github.event.inputs.release_version }}
+          path: ./artifacts
 
-      - name: Configure Git
+      - name: Deploy TestProject to Staging
+        shell: powershell
         run: |
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
+          $stagingIP = "172.16.3.120"
+          $src  = "$PWD\artifacts\projects\TestProject"
+          $dest = "\\$stagingIP\C$\Program Files\Inductive Automation\Ignition\data\projects\TestProject"
+          Write-Host "Deploying TestProject v${{ github.event.inputs.release_version }} to Staging..."
+          if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item -Path "$src\*" -Destination $dest -Recurse -Force
+          if (Test-Path "$dest\project.json") {
+            Write-Host "[OK] TestProject deployed!" -ForegroundColor Green
+          } else { Write-Host "[FAIL]" -ForegroundColor Red; exit 1 }
+          try {
+            Invoke-WebRequest -Uri "http://${stagingIP}:8088/data/api/v1/config/scan" `
+              -Method POST `
+              -Headers @{ "X-Ignition-API-Token" = "${{ secrets.STAGE_GATEWAY_API_KEY }}" } `
+              -UseBasicParsing -TimeoutSec 15 | Out-Null
+            Write-Host "[OK] Config scan triggered!" -ForegroundColor Green
+          } catch { Write-Host "Scan failed" -ForegroundColor Yellow }
 
-      - name: Merge to Main
+      - name: Deploy FactoryDashboard to Staging
+        shell: powershell
         run: |
-          set -e
+          $stagingIP = "172.16.3.120"
+          $src  = "$PWD\artifacts\projects\FactoryDashboard"
+          $dest = "\\$stagingIP\C$\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard"
+          if (-not (Test-Path $src)) { Write-Host "Skipping FactoryDashboard"; exit 0 }
+          if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item -Path "$src\*" -Destination $dest -Recurse -Force
+          if (Test-Path "$dest\project.json") {
+            Write-Host "[OK] FactoryDashboard deployed!" -ForegroundColor Green
+          } else { Write-Host "[FAIL]" -ForegroundColor Red; exit 1 }
+          try {
+            Invoke-WebRequest -Uri "http://${stagingIP}:8088/data/api/v1/config/scan" `
+              -Method POST `
+              -Headers @{ "X-Ignition-API-Token" = "${{ secrets.STAGE_GATEWAY_API_KEY }}" } `
+              -UseBasicParsing -TimeoutSec 15 | Out-Null
+            Write-Host "[OK] Config scan triggered!" -ForegroundColor Green
+          } catch { Write-Host "Scan failed" -ForegroundColor Yellow }
 
-          BRANCH="${{ github.event.inputs.releaseBranch }}"
+      - name: Create release tag
+        shell: powershell
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag -a "v${{ github.event.inputs.release_version }}" -m "Release v${{ github.event.inputs.release_version }}"
+          git push origin "v${{ github.event.inputs.release_version }}"
+          Write-Host "Tag v${{ github.event.inputs.release_version }} created!" -ForegroundColor Green
 
-          echo "Merging $BRANCH to main"
-          git checkout main
-          git merge "$BRANCH" --no-ff -m "Merge $BRANCH into main"
-          git push origin main
-
-          echo "✓ Release merged to main"
+      - name: Verify Staging
+        shell: powershell
+        run: |
+          $stagingIP = "172.16.3.120"
+          $base = "\\$stagingIP\C$\Program Files\Inductive Automation\Ignition\data\projects"
+          Write-Host "==========================================" -ForegroundColor Cyan
+          Write-Host " Release v${{ github.event.inputs.release_version }} on Staging" -ForegroundColor Cyan
+          Write-Host "==========================================" -ForegroundColor Cyan
+          @("TestProject","FactoryDashboard") | ForEach-Object {
+            if (Test-Path "$base\$_\project.json") {
+              Write-Host "[OK] $_ deployed" -ForegroundColor Green
+            } else { Write-Host "[FAIL] $_ missing" -ForegroundColor Red }
+          }
+          Write-Host "Staging: http://${stagingIP}:8088/web/home"
+          Write-Host "==========================================" -ForegroundColor Cyan
