@@ -1,7 +1,7 @@
 # GitHub Actions CI/CD Pipeline for Ignition 8.3
-# Deploy method: xcopy directly to Ignition projects folder
-# Dev runner:     self-hosted on 172.16.3.148
-# Staging runner: self-hosted-staging on 172.16.3.120
+# Runner: StagingRunner (self-hosted-staging label) for BOTH environments
+# Dev:     172.16.3.148 — copies via network share \\172.16.3.148\C$\...
+# Staging: 172.16.3.120 — copies locally C:\...
 name: CI/CD Pipeline
 permissions:
   contents: read
@@ -95,19 +95,20 @@ jobs:
           ./scripts/test-pylib.sh pylib/Mustry/Tests
 
   # ─────────────────────────────────────────────────────────────
-  # DEPLOY TO DEVELOPMENT
-  # Runner on 172.16.3.148 — copies files directly to Ignition
-  # Uses localhost:8088 — no firewall/tunnel needed
+  # DEPLOY TO DEVELOPMENT (172.16.3.148)
+  # Runner: StagingRunner on 172.16.3.120
+  # Method: PowerShell Copy-Item via network share to dev server
   # ─────────────────────────────────────────────────────────────
   deploy-dev:
     name: Deploy to Development
-    runs-on: self-hosted
+    runs-on: self-hosted-staging   # ← StagingRunner handles this
     needs: [build, test-pylib]
     if: |
       (github.ref == 'refs/heads/develop' && github.event_name == 'push') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.target_env == 'dev')
     environment:
       name: development
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -118,77 +119,122 @@ jobs:
           name: build-artifacts-${{ github.sha }}
           path: ./artifacts
 
-      - name: Fix Ignition Permissions
+      - name: Deploy TestProject to Dev (via network)
         shell: powershell
         run: |
-          $path = "C:\Program Files\Inductive Automation\Ignition\data"
-          icacls $path /grant "Administrator:(OI)(CI)F" /T 2>$null | Out-Null
-          Write-Host "Permissions OK"
+          $devIP = "172.16.3.148"
+          $src   = "$PWD\artifacts\projects\TestProject"
+          $dest  = "\\$devIP\C$\Program Files\Inductive Automation\Ignition\data\projects\TestProject"
 
-      - name: Deploy TestProject to Dev
-        shell: cmd
-        run: |
-          echo ==========================================
-          echo Deploying TestProject to Dev...
-          echo ==========================================
-          set DEST=C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject
-          if exist "%DEST%" ( rmdir /S /Q "%DEST%" )
-          xcopy /E /I /Y "artifacts\projects\TestProject" "%DEST%"
-          if not exist "%DEST%\project.json" (
-            echo ERROR: TestProject copy failed!
-            exit /b 1
-          )
-          echo TestProject copied OK!
-          curl -s -X POST -H "X-Ignition-API-Token: %DEV_GATEWAY_API_KEY%" -H "Content-Type: application/json" "http://localhost:8088/data/api/v1/config/scan"
-          echo TestProject deployed to Dev!
-        env:
-          DEV_GATEWAY_API_KEY: ${{ secrets.DEV_GATEWAY_API_KEY }}
+          Write-Host "=========================================="
+          Write-Host " Deploying TestProject → Dev ($devIP)"
+          Write-Host "=========================================="
 
-      - name: Deploy FactoryDashboard to Dev
-        shell: cmd
+          if (-not (Test-Path $src)) {
+            Write-Host "ERROR: Source not found: $src" -ForegroundColor Red
+            Get-ChildItem "$PWD\artifacts\projects\" -ErrorAction SilentlyContinue
+            exit 1
+          }
+
+          if (Test-Path $dest) {
+            Write-Host "Removing old TestProject..."
+            Remove-Item -Recurse -Force $dest
+          }
+
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item -Path "$src\*" -Destination $dest -Recurse -Force
+
+          if (Test-Path "$dest\project.json") {
+            Write-Host "[OK] TestProject copied to Dev!" -ForegroundColor Green
+          } else {
+            Write-Host "[FAIL] project.json missing!" -ForegroundColor Red
+            exit 1
+          }
+
+          Write-Host "Triggering config scan on Dev..."
+          try {
+            Invoke-WebRequest -Uri "http://${devIP}:8088/data/api/v1/config/scan" `
+              -Method POST `
+              -Headers @{ "X-Ignition-API-Token" = "${{ secrets.DEV_GATEWAY_KEY }}"; "Content-Type" = "application/json" } `
+              -UseBasicParsing -TimeoutSec 15 | Out-Null
+            Write-Host "[OK] Config scan triggered on Dev!" -ForegroundColor Green
+          } catch {
+            Write-Host "Scan failed: $($_.Exception.Message)" -ForegroundColor Yellow
+            try {
+              Invoke-WebRequest -Uri "http://${devIP}:8088/data/api/v1/restart-tasks/restart?confirm=true" `
+                -Method POST `
+                -Headers @{ "X-Ignition-API-Token" = "${{ secrets.DEV_GATEWAY_KEY }}" } `
+                -UseBasicParsing -TimeoutSec 20 | Out-Null
+              Write-Host "Gateway restart triggered on Dev!" -ForegroundColor Yellow
+            } catch { Write-Host "Restart also failed" -ForegroundColor Yellow }
+          }
+
+      - name: Deploy FactoryDashboard to Dev (via network)
+        shell: powershell
         run: |
-          echo Deploying FactoryDashboard to Dev...
-          set DEST=C:\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard
-          if exist "%DEST%" ( rmdir /S /Q "%DEST%" )
-          xcopy /E /I /Y "artifacts\projects\FactoryDashboard" "%DEST%"
-          if not exist "%DEST%\project.json" (
-            echo ERROR: FactoryDashboard copy failed!
-            exit /b 1
-          )
-          echo FactoryDashboard copied OK!
-          curl -s -X POST -H "X-Ignition-API-Token: %DEV_GATEWAY_API_KEY%" -H "Content-Type: application/json" "http://localhost:8088/data/api/v1/config/scan"
-          echo FactoryDashboard deployed to Dev!
-        env:
-          DEV_GATEWAY_API_KEY: ${{ secrets.DEV_GATEWAY_API_KEY }}
+          $devIP = "172.16.3.148"
+          $src   = "$PWD\artifacts\projects\FactoryDashboard"
+          $dest  = "\\$devIP\C$\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard"
+
+          if (-not (Test-Path $src)) {
+            Write-Host "FactoryDashboard not found - skipping" -ForegroundColor Yellow
+            exit 0
+          }
+
+          if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item -Path "$src\*" -Destination $dest -Recurse -Force
+
+          if (Test-Path "$dest\project.json") {
+            Write-Host "[OK] FactoryDashboard copied to Dev!" -ForegroundColor Green
+          } else {
+            Write-Host "[FAIL] project.json missing!" -ForegroundColor Red
+            exit 1
+          }
+
+          try {
+            Invoke-WebRequest -Uri "http://${devIP}:8088/data/api/v1/config/scan" `
+              -Method POST `
+              -Headers @{ "X-Ignition-API-Token" = "${{ secrets.DEV_GATEWAY_KEY }}"; "Content-Type" = "application/json" } `
+              -UseBasicParsing -TimeoutSec 15 | Out-Null
+            Write-Host "[OK] Config scan triggered!" -ForegroundColor Green
+          } catch {
+            Write-Host "Scan failed: $($_.Exception.Message)" -ForegroundColor Yellow
+          }
 
       - name: Verify Dev Deployment
-        shell: cmd
+        shell: powershell
         run: |
-          echo ==========================================
-          echo Verifying Dev deployment...
-          if exist "C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject\project.json" (
-            echo [OK] TestProject deployed
-          ) else ( echo [FAIL] TestProject missing! )
-          if exist "C:\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard\project.json" (
-            echo [OK] FactoryDashboard deployed
-          ) else ( echo [FAIL] FactoryDashboard missing! )
-          echo Dev URL: http://localhost:8088/web/home
-          echo ==========================================
+          $devIP = "172.16.3.148"
+          $base  = "\\$devIP\C$\Program Files\Inductive Automation\Ignition\data\projects"
+          Write-Host "==========================================" -ForegroundColor Cyan
+          Write-Host " Dev Deployment Verification" -ForegroundColor Cyan
+          Write-Host "==========================================" -ForegroundColor Cyan
+          @("TestProject","FactoryDashboard") | ForEach-Object {
+            if (Test-Path "$base\$_\project.json") {
+              Write-Host "[OK] $_ deployed to Dev" -ForegroundColor Green
+            } else {
+              Write-Host "[FAIL] $_ missing on Dev!" -ForegroundColor Red
+            }
+          }
+          Write-Host "Dev URL: http://${devIP}:8088/web/home"
+          Write-Host "==========================================" -ForegroundColor Cyan
 
   # ─────────────────────────────────────────────────────────────
-  # DEPLOY TO STAGING
-  # Runner on 172.16.3.120 — copies files directly to Ignition
-  # Waits for dev to complete + approval popup
+  # DEPLOY TO STAGING (172.16.3.120)
+  # Runner: StagingRunner on 172.16.3.120
+  # Method: PowerShell Copy-Item locally — fastest, most reliable
   # ─────────────────────────────────────────────────────────────
   deploy-staging:
     name: Deploy to Staging
-    runs-on: self-hosted-staging
-    needs: [deploy-dev]
+    runs-on: self-hosted-staging   # ← same StagingRunner handles this
+    needs: [deploy-dev]            # ← waits for dev to complete first
     if: |
       github.event_name == 'push' ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.target_env == 'staging')
     environment:
-      name: staging
+      name: staging                # ← approval popup comes from here
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -204,54 +250,100 @@ jobs:
         run: |
           $path = "C:\Program Files\Inductive Automation\Ignition\data"
           icacls $path /grant "Administrator:(OI)(CI)F" /T 2>$null | Out-Null
-          Write-Host "Permissions OK"
+          Write-Host "Permissions OK" -ForegroundColor Green
 
-      - name: Deploy TestProject to Staging
-        shell: cmd
+      - name: Deploy TestProject to Staging (local)
+        shell: powershell
         run: |
-          echo ==========================================
-          echo Deploying TestProject to Staging...
-          echo ==========================================
-          set DEST=C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject
-          if exist "%DEST%" ( rmdir /S /Q "%DEST%" )
-          xcopy /E /I /Y "artifacts\projects\TestProject" "%DEST%"
-          if not exist "%DEST%\project.json" (
-            echo ERROR: TestProject copy failed!
-            exit /b 1
-          )
-          echo TestProject copied OK!
-          curl -s -X POST -H "X-Ignition-API-Token: %STAGE_GATEWAY_API_KEY%" -H "Content-Type: application/json" "http://localhost:8088/data/api/v1/config/scan"
-          echo TestProject deployed to Staging!
+          $src  = "$PWD\artifacts\projects\TestProject"
+          $dest = "C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject"
+
+          Write-Host "=========================================="
+          Write-Host " Deploying TestProject → Staging (local)"
+          Write-Host "=========================================="
+
+          if (-not (Test-Path $src)) {
+            Write-Host "ERROR: Source not found!" -ForegroundColor Red
+            exit 1
+          }
+
+          if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item -Path "$src\*" -Destination $dest -Recurse -Force
+
+          if (Test-Path "$dest\project.json") {
+            Write-Host "[OK] TestProject deployed to Staging!" -ForegroundColor Green
+          } else {
+            Write-Host "[FAIL] project.json missing!" -ForegroundColor Red
+            exit 1
+          }
+
+          try {
+            Invoke-WebRequest -Uri "http://localhost:8088/data/api/v1/config/scan" `
+              -Method POST `
+              -Headers @{ "X-Ignition-API-Token" = "${{ secrets.STAGE_GATEWAY_API_KEY }}"; "Content-Type" = "application/json" } `
+              -UseBasicParsing -TimeoutSec 15 | Out-Null
+            Write-Host "[OK] Config scan triggered on Staging!" -ForegroundColor Green
+          } catch {
+            Write-Host "Scan failed: $($_.Exception.Message)" -ForegroundColor Yellow
+            try {
+              Invoke-WebRequest -Uri "http://localhost:8088/data/api/v1/restart-tasks/restart?confirm=true" `
+                -Method POST `
+                -Headers @{ "X-Ignition-API-Token" = "${{ secrets.STAGE_GATEWAY_API_KEY }}" } `
+                -UseBasicParsing -TimeoutSec 20 | Out-Null
+              Write-Host "Gateway restart triggered!" -ForegroundColor Yellow
+            } catch { Write-Host "Restart also failed" -ForegroundColor Yellow }
+          }
         env:
           STAGE_GATEWAY_API_KEY: ${{ secrets.STAGE_GATEWAY_API_KEY }}
 
-      - name: Deploy FactoryDashboard to Staging
-        shell: cmd
+      - name: Deploy FactoryDashboard to Staging (local)
+        shell: powershell
         run: |
-          echo Deploying FactoryDashboard to Staging...
-          set DEST=C:\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard
-          if exist "%DEST%" ( rmdir /S /Q "%DEST%" )
-          xcopy /E /I /Y "artifacts\projects\FactoryDashboard" "%DEST%"
-          if not exist "%DEST%\project.json" (
-            echo ERROR: FactoryDashboard copy failed!
-            exit /b 1
-          )
-          echo FactoryDashboard copied OK!
-          curl -s -X POST -H "X-Ignition-API-Token: %STAGE_GATEWAY_API_KEY%" -H "Content-Type: application/json" "http://localhost:8088/data/api/v1/config/scan"
-          echo FactoryDashboard deployed to Staging!
+          $src  = "$PWD\artifacts\projects\FactoryDashboard"
+          $dest = "C:\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard"
+
+          if (-not (Test-Path $src)) {
+            Write-Host "FactoryDashboard not found - skipping" -ForegroundColor Yellow
+            exit 0
+          }
+
+          if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item -Path "$src\*" -Destination $dest -Recurse -Force
+
+          if (Test-Path "$dest\project.json") {
+            Write-Host "[OK] FactoryDashboard deployed to Staging!" -ForegroundColor Green
+          } else {
+            Write-Host "[FAIL] project.json missing!" -ForegroundColor Red
+            exit 1
+          }
+
+          try {
+            Invoke-WebRequest -Uri "http://localhost:8088/data/api/v1/config/scan" `
+              -Method POST `
+              -Headers @{ "X-Ignition-API-Token" = "${{ secrets.STAGE_GATEWAY_API_KEY }}"; "Content-Type" = "application/json" } `
+              -UseBasicParsing -TimeoutSec 15 | Out-Null
+            Write-Host "[OK] Config scan triggered!" -ForegroundColor Green
+          } catch {
+            Write-Host "Scan failed" -ForegroundColor Yellow
+          }
         env:
           STAGE_GATEWAY_API_KEY: ${{ secrets.STAGE_GATEWAY_API_KEY }}
 
       - name: Verify Staging Deployment
-        shell: cmd
+        shell: powershell
         run: |
-          echo ==========================================
-          echo Verifying Staging deployment...
-          if exist "C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject\project.json" (
-            echo [OK] TestProject deployed to Staging
-          ) else ( echo [FAIL] TestProject missing on Staging! )
-          if exist "C:\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard\project.json" (
-            echo [OK] FactoryDashboard deployed to Staging
-          ) else ( echo [FAIL] FactoryDashboard missing on Staging! )
-          echo Staging URL: http://172.16.3.120:8088/web/home
-          echo ==========================================
+          $base = "C:\Program Files\Inductive Automation\Ignition\data\projects"
+          Write-Host "==========================================" -ForegroundColor Cyan
+          Write-Host " Staging Deployment Verification" -ForegroundColor Cyan
+          Write-Host "==========================================" -ForegroundColor Cyan
+          @("TestProject","FactoryDashboard") | ForEach-Object {
+            if (Test-Path "$base\$_\project.json") {
+              Write-Host "[OK] $_ deployed to Staging" -ForegroundColor Green
+            } else {
+              Write-Host "[FAIL] $_ missing on Staging!" -ForegroundColor Red
+            }
+          }
+          Write-Host "Staging URL: http://172.16.3.120:8088/web/home"
+          Write-Host "==========================================" -ForegroundColor Cyan
