@@ -1,16 +1,7 @@
 # ============================================================
 # GitHub Actions CI/CD Pipeline for Ignition 8.3
 # Runner: StagingRunner on 172.16.3.148 (label: self-hosted-staging)
-#
-# FLOW:
-#   push to develop → deploys to BOTH Dev + Staging
-#   manual → choose dev, staging, or both
-#
-# Secrets:
-#   DEV_GATEWAY_KEY       ← Dev API token
-#   DEV_GATEWAY_PASS      ← Dev password
-#   STAGE_GATEWAY_API_KEY ← Staging API token
-#   STAGE_GATEWAY_PASS    ← Staging password
+# push to develop deploys to BOTH Dev + Staging
 # ============================================================
 name: CI/CD Pipeline
 permissions:
@@ -22,7 +13,7 @@ concurrency:
 on:
   push:
     branches:
-      - develop        # → deploys to BOTH dev and staging
+      - develop
   pull_request:
     branches:
       - develop
@@ -43,9 +34,6 @@ env:
   BUILD_CONFIGURATION: Release
 
 jobs:
-  # ──────────────────────────────────────────────────────────
-  # BUILD
-  # ──────────────────────────────────────────────────────────
   build:
     name: Build and Validate
     runs-on: ubuntu-latest
@@ -99,10 +87,6 @@ jobs:
           chmod +x ./scripts/test-pylib.sh
           ./scripts/test-pylib.sh pylib/Mustry/Tests
 
-  # ──────────────────────────────────────────────────────────
-  # DEPLOY TO DEVELOPMENT (172.16.3.148)
-  # Triggers: push to develop OR manual dev/both
-  # ──────────────────────────────────────────────────────────
   deploy-dev:
     name: Deploy to Development
     runs-on: self-hosted-staging
@@ -115,7 +99,6 @@ jobs:
       ))
     environment:
       name: development
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -137,9 +120,7 @@ jobs:
         run: |
           $src  = "$PWD\artifacts\projects\TestProject"
           $dest = "C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject"
-          Write-Host "=========================================="
-          Write-Host " Deploying TestProject → Dev"
-          Write-Host "=========================================="
+          Write-Host "Deploying TestProject to Dev..."
           if (-not (Test-Path $src)) {
             Write-Host "ERROR: Source not found: $src" -ForegroundColor Red
             Get-ChildItem "$PWD\artifacts\projects\" -ErrorAction SilentlyContinue
@@ -149,9 +130,8 @@ jobs:
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
           Copy-Item -Path "$src\*" -Destination $dest -Recurse -Force
           if (Test-Path "$dest\project.json") {
-            Write-Host "[OK] TestProject deployed!" -ForegroundColor Green
-            Get-ChildItem $dest | Select-Object Name, LastWriteTime
-          } else { Write-Host "[FAIL]" -ForegroundColor Red; exit 1 }
+            Write-Host "[OK] TestProject deployed to Dev!" -ForegroundColor Green
+          } else { Write-Host "[FAIL] project.json missing!" -ForegroundColor Red; exit 1 }
 
       - name: Deploy FactoryDashboard to Dev
         shell: powershell
@@ -163,7 +143,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
           Copy-Item -Path "$src\*" -Destination $dest -Recurse -Force
           if (Test-Path "$dest\project.json") {
-            Write-Host "[OK] FactoryDashboard deployed!" -ForegroundColor Green
+            Write-Host "[OK] FactoryDashboard deployed to Dev!" -ForegroundColor Green
           } else { Write-Host "[FAIL]" -ForegroundColor Red; exit 1 }
 
       - name: Create WebDev reload script on Dev
@@ -171,30 +151,11 @@ jobs:
         run: |
           $webdevPath = "C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject\com.inductiveautomation.webdev\endpoints\reload"
           New-Item -ItemType Directory -Force -Path $webdevPath | Out-Null
-          $timestamp = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ss") + "Z"
-          @"
-{
-  "scope": "G",
-  "version": 1,
-  "restricted": false,
-  "overridable": true,
-  "files": ["code.py"],
-  "attributes": {
-    "lastModification": {
-      "actor": "cicd-pipeline",
-      "timestamp": "$timestamp"
-    }
-  }
-}
-"@ | Out-File -FilePath "$webdevPath\resource.json" -Encoding UTF8
-          @'
-def doGet(request, session):
-    try:
-        system.project.requestScan()
-        return {"status": "success", "message": "Project reloaded"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-'@ | Out-File -FilePath "$webdevPath\code.py" -Encoding UTF8
+          $ts = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
+          $json = '{"scope":"G","version":1,"restricted":false,"overridable":true,"files":["code.py"],"attributes":{"lastModification":{"actor":"cicd","timestamp":"' + $ts + '"}}}'
+          Set-Content -Path "$webdevPath\resource.json" -Value $json -Encoding UTF8
+          $py = "def doGet(request, session):`n    try:`n        system.project.requestScan()`n        return {'status': 'success', 'message': 'Reloaded'}`n    except Exception as e:`n        return {'status': 'error', 'message': str(e)}"
+          Set-Content -Path "$webdevPath\code.py" -Value $py -Encoding UTF8
           Write-Host "[OK] WebDev reload script created on Dev!" -ForegroundColor Green
 
       - name: Wait and reload Dev
@@ -203,11 +164,10 @@ def doGet(request, session):
           Write-Host "Waiting 15s for Ignition file watcher..."
           Start-Sleep -Seconds 15
           try {
-            $r = Invoke-WebRequest "http://localhost:8088/system/webdev/TestProject/reload" `
-              -Method GET -UseBasicParsing -TimeoutSec 20
-            Write-Host "[OK] Dev reloaded: $($r.Content)" -ForegroundColor Green
+            $r = Invoke-WebRequest "http://localhost:8088/system/webdev/TestProject/reload" -Method GET -UseBasicParsing -TimeoutSec 20
+            Write-Host "[OK] Dev reloaded! $($r.Content)" -ForegroundColor Green
           } catch {
-            Write-Host "WebDev reload: $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "WebDev: $($_.Exception.Message)" -ForegroundColor Yellow
           }
 
       - name: Verify Dev
@@ -219,18 +179,13 @@ def doGet(request, session):
           Write-Host "==========================================" -ForegroundColor Cyan
           @("TestProject","FactoryDashboard") | ForEach-Object {
             if (Test-Path "$base\$_\project.json") {
-              $time = (Get-Item "$base\$_\project.json").LastWriteTime
-              Write-Host "[OK] $_ deployed at $time" -ForegroundColor Green
+              $t = (Get-Item "$base\$_\project.json").LastWriteTime
+              Write-Host "[OK] $_ at $t" -ForegroundColor Green
             } else { Write-Host "[FAIL] $_ missing" -ForegroundColor Red }
           }
           Write-Host "Dev: http://172.16.3.148:8088/web/home"
           Write-Host "==========================================" -ForegroundColor Cyan
 
-  # ──────────────────────────────────────────────────────────
-  # DEPLOY TO STAGING (172.16.3.120)
-  # Triggers: push to develop OR manual staging/both
-  # Runs in PARALLEL with deploy-dev
-  # ──────────────────────────────────────────────────────────
   deploy-staging:
     name: Deploy to Staging
     runs-on: self-hosted-staging
@@ -243,7 +198,6 @@ def doGet(request, session):
       ))
     environment:
       name: staging
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -254,26 +208,24 @@ def doGet(request, session):
           name: build-artifacts-${{ github.sha }}
           path: ./artifacts
 
-      - name: Check network to Staging (172.16.3.120)
+      - name: Check network to Staging
         shell: powershell
         run: |
           if (Test-Path "\\172.16.3.120\C$") {
             Write-Host "[OK] Staging reachable!" -ForegroundColor Green
           } else {
             Write-Host "[FAIL] Cannot reach \\172.16.3.120\C$" -ForegroundColor Red
-            Write-Host "Run on 172.16.3.120 as Admin:" -ForegroundColor Yellow
-            Write-Host "  net share C$=C:\ /GRANT:Administrator,FULL" -ForegroundColor White
-            Write-Host "  netsh advfirewall firewall set rule group='File and Printer Sharing' new enable=Yes" -ForegroundColor White
+            Write-Host "Run on 172.16.3.120: net share C$=C:\ /GRANT:Administrator,FULL" -ForegroundColor Yellow
             exit 1
           }
 
       - name: Deploy TestProject to Staging
         shell: powershell
         run: |
-          $stagingIP = "172.16.3.120"
+          $ip   = "172.16.3.120"
           $src  = "$PWD\artifacts\projects\TestProject"
-          $dest = "\\$stagingIP\C$\Program Files\Inductive Automation\Ignition\data\projects\TestProject"
-          Write-Host "Deploying TestProject → Staging ($stagingIP)..."
+          $dest = "\\$ip\C$\Program Files\Inductive Automation\Ignition\data\projects\TestProject"
+          Write-Host "Deploying TestProject to Staging ($ip)..."
           if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
           Copy-Item -Path "$src\*" -Destination $dest -Recurse -Force
@@ -284,9 +236,9 @@ def doGet(request, session):
       - name: Deploy FactoryDashboard to Staging
         shell: powershell
         run: |
-          $stagingIP = "172.16.3.120"
+          $ip   = "172.16.3.120"
           $src  = "$PWD\artifacts\projects\FactoryDashboard"
-          $dest = "\\$stagingIP\C$\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard"
+          $dest = "\\$ip\C$\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard"
           if (-not (Test-Path $src)) { Write-Host "Skipping FactoryDashboard" -ForegroundColor Yellow; exit 0 }
           if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
@@ -298,62 +250,42 @@ def doGet(request, session):
       - name: Create WebDev reload script on Staging
         shell: powershell
         run: |
-          $stagingIP  = "172.16.3.120"
-          $webdevPath = "\\$stagingIP\C$\Program Files\Inductive Automation\Ignition\data\projects\TestProject\com.inductiveautomation.webdev\endpoints\reload"
+          $ip = "172.16.3.120"
+          $webdevPath = "\\$ip\C$\Program Files\Inductive Automation\Ignition\data\projects\TestProject\com.inductiveautomation.webdev\endpoints\reload"
           New-Item -ItemType Directory -Force -Path $webdevPath | Out-Null
-          $timestamp = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ss") + "Z"
-          @"
-{
-  "scope": "G",
-  "version": 1,
-  "restricted": false,
-  "overridable": true,
-  "files": ["code.py"],
-  "attributes": {
-    "lastModification": {
-      "actor": "cicd-pipeline",
-      "timestamp": "$timestamp"
-    }
-  }
-}
-"@ | Out-File -FilePath "$webdevPath\resource.json" -Encoding UTF8
-          @'
-def doGet(request, session):
-    try:
-        system.project.requestScan()
-        return {"status": "success", "message": "Project reloaded"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-'@ | Out-File -FilePath "$webdevPath\code.py" -Encoding UTF8
+          $ts = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
+          $json = '{"scope":"G","version":1,"restricted":false,"overridable":true,"files":["code.py"],"attributes":{"lastModification":{"actor":"cicd","timestamp":"' + $ts + '"}}}'
+          Set-Content -Path "$webdevPath\resource.json" -Value $json -Encoding UTF8
+          $py = "def doGet(request, session):`n    try:`n        system.project.requestScan()`n        return {'status': 'success', 'message': 'Reloaded'}`n    except Exception as e:`n        return {'status': 'error', 'message': str(e)}"
+          Set-Content -Path "$webdevPath\code.py" -Value $py -Encoding UTF8
           Write-Host "[OK] WebDev reload script created on Staging!" -ForegroundColor Green
 
       - name: Wait and reload Staging
         shell: powershell
         run: |
-          $stagingIP = "172.16.3.120"
+          $ip = "172.16.3.120"
           Write-Host "Waiting 15s for Ignition file watcher..."
           Start-Sleep -Seconds 15
           try {
-            $r = Invoke-WebRequest "http://${stagingIP}:8088/system/webdev/TestProject/reload" `
-              -Method GET -UseBasicParsing -TimeoutSec 20
-            Write-Host "[OK] Staging reloaded: $($r.Content)" -ForegroundColor Green
+            $r = Invoke-WebRequest "http://${ip}:8088/system/webdev/TestProject/reload" -Method GET -UseBasicParsing -TimeoutSec 20
+            Write-Host "[OK] Staging reloaded! $($r.Content)" -ForegroundColor Green
           } catch {
-            Write-Host "WebDev reload: $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "WebDev: $($_.Exception.Message)" -ForegroundColor Yellow
           }
 
       - name: Verify Staging
         shell: powershell
         run: |
-          $stagingIP = "172.16.3.120"
-          $base = "\\$stagingIP\C$\Program Files\Inductive Automation\Ignition\data\projects"
+          $ip   = "172.16.3.120"
+          $base = "\\$ip\C$\Program Files\Inductive Automation\Ignition\data\projects"
           Write-Host "==========================================" -ForegroundColor Cyan
           Write-Host " Staging Deployment Complete!" -ForegroundColor Cyan
           Write-Host "==========================================" -ForegroundColor Cyan
           @("TestProject","FactoryDashboard") | ForEach-Object {
             if (Test-Path "$base\$_\project.json") {
-              $time = (Get-Item "$base\$_\project.json").LastWriteTime
-              Write-Host "[OK] $_ deployed at $time" -ForegroundColor Green
+              $t = (Get-Item "$base\$_\project.json").LastWriteTime
+              Write-Host "[OK] $_ at $t" -ForegroundColor Green
             } else { Write-Host "[FAIL] $_ missing" -ForegroundColor Red }
           }
-          Write-Host "Staging: http://172.16.3.120:8088/web/home"
+          Write-Host "Staging: http://${ip}:8088/web/home"
           Write-Host "==========================================" -ForegroundColor Cyan
