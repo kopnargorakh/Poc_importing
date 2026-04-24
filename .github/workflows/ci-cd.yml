@@ -153,20 +153,33 @@ jobs:
       - name: Reload Ignition Dev
         shell: powershell
         run: |
-          $gwcmd = "C:\Program Files\Inductive Automation\Ignition\gwcmd.bat"
+          $ignPath = "C:\Program Files\Inductive Automation\Ignition"
+          $gwcmd   = "$ignPath\gwcmd.bat"
+
           Write-Host "Reloading Ignition Dev..."
+          Write-Host "gwcmd path: $gwcmd"
+
           if (Test-Path $gwcmd) {
-            $result = & cmd /c """$gwcmd"" --project-scan" 2>&1
-            Write-Host "gwcmd result: $result"
-            Write-Host "[OK] Projects reloaded via gwcmd!"
-          } else {
-            Write-Host "gwcmd not found - using file touch fallback..."
-            $p = "C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject\project.json"
+            Write-Host "gwcmd found - checking available options..."
+            $help = & cmd /c """$gwcmd"" -h" 2>&1
+            Write-Host "gwcmd help: $help"
+
+            Write-Host "Trying gwcmd -r (reload)..."
+            $r1 = & cmd /c """$gwcmd"" -r" 2>&1
+            Write-Host "Result: $r1"
+          }
+
+          Write-Host "Touching project.json to trigger file watcher..."
+          $projects = @("TestProject", "FactoryDashboard")
+          foreach ($proj in $projects) {
+            $p = "C:\Program Files\Inductive Automation\Ignition\data\projects\$proj\project.json"
             if (Test-Path $p) {
-              (Get-Item $p).LastWriteTime = Get-Date
-              Write-Host "[OK] project.json touched - Ignition will detect change"
+              $content = Get-Content $p -Raw
+              Set-Content -Path $p -Value $content -NoNewline
+              Write-Host "[OK] Touched $proj\project.json"
             }
           }
+          Write-Host "Ignition will reload projects automatically!"
 
       - name: Verify Dev
         shell: powershell
@@ -260,35 +273,17 @@ jobs:
         shell: powershell
         run: |
           $ip = "172.16.3.120"
-          Write-Host "Reloading Ignition Staging..."
-          try {
-            $session = New-PSSession -ComputerName $ip -ErrorAction Stop
-            $result = Invoke-Command -Session $session -ScriptBlock {
-              $gwcmd = "C:\Program Files\Inductive Automation\Ignition\gwcmd.bat"
-              if (Test-Path $gwcmd) {
-                $r = & cmd /c """$gwcmd"" --project-scan" 2>&1
-                "gwcmd: $r"
-              } else {
-                $p = "C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject\project.json"
-                if (Test-Path $p) {
-                  (Get-Item $p).LastWriteTime = Get-Date
-                  "File touch done"
-                } else {
-                  "project.json not found"
-                }
-              }
-            }
-            Remove-PSSession $session
-            Write-Host "[OK] Staging reloaded: $result"
-          } catch {
-            Write-Host "Remote session failed: $($_.Exception.Message)"
-            Write-Host "Using network file touch fallback..."
-            $p = "\\$ip\C$\Program Files\Inductive Automation\Ignition\data\projects\TestProject\project.json"
+          Write-Host "Touching project files on Staging to trigger reload..."
+          $projects = @("TestProject", "FactoryDashboard")
+          foreach ($proj in $projects) {
+            $p = "\\$ip\C$\Program Files\Inductive Automation\Ignition\data\projects\$proj\project.json"
             if (Test-Path $p) {
-              (Get-Item $p).LastWriteTime = Get-Date
-              Write-Host "[OK] project.json touched on Staging"
+              $content = Get-Content $p -Raw
+              Set-Content -Path $p -Value $content -NoNewline
+              Write-Host "[OK] Touched $proj\project.json on Staging"
             }
           }
+          Write-Host "Ignition Staging will reload projects automatically!"
 
       - name: Verify Staging
         shell: powershell
