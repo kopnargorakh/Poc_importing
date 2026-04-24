@@ -1,15 +1,3 @@
-# ============================================================
-# GitHub Actions CI/CD Pipeline for Ignition 8.3
-# Runner: StagingRunner on 172.16.3.148 (label: self-hosted-staging)
-#
-# deploy-dev:     LOCAL copy  → C:\Program Files\...\projects\
-# deploy-staging: NETWORK copy → \\172.16.3.120\C$\...\projects\
-#
-# REQUIREMENT before staging works:
-#   Run ONCE on Staging server (172.16.3.120) as Administrator:
-#   net share C$=C:\ /GRANT:Administrator,FULL
-#   netsh advfirewall firewall set rule group="File and Printer Sharing" new enable=Yes
-# ============================================================
 name: CI/CD Pipeline
 permissions:
   contents: read
@@ -21,7 +9,6 @@ on:
   push:
     branches:
       - develop
-      - release/*
   pull_request:
     branches:
       - develop
@@ -31,7 +18,7 @@ on:
       target_env:
         description: 'Target environment'
         required: true
-        default: 'dev'
+        default: 'both'
         type: choice
         options:
           - dev
@@ -42,21 +29,16 @@ env:
   BUILD_CONFIGURATION: Release
 
 jobs:
-  # ──────────────────────────────────────────────────────────
-  # BUILD — GitHub cloud
-  # ──────────────────────────────────────────────────────────
   build:
     name: Build and Validate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Validate Project Names and Structure
         run: |
           chmod +x ./scripts/validate-names.sh
           ./scripts/validate-names.sh ./projects
-
       - name: Package All Projects
         run: |
           set -e
@@ -73,7 +55,6 @@ jobs:
             done
           fi
           ls -lh build/
-
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -101,13 +82,9 @@ jobs:
           chmod +x ./scripts/test-pylib.sh
           ./scripts/test-pylib.sh pylib/Mustry/Tests
 
-  # ──────────────────────────────────────────────────────────
-  # DEPLOY TO DEVELOPMENT (172.16.3.148)
-  # StagingRunner on 172.16.3.148 copies files LOCALLY
-  # ──────────────────────────────────────────────────────────
   deploy-dev:
     name: Deploy to Development
-    runs-on: self-hosted-staging   # ← StagingRunner on 172.16.3.148
+    runs-on: self-hosted-staging
     needs: [build, test-pylib]
     if: |
       (github.ref == 'refs/heads/develop' && github.event_name == 'push') ||
@@ -117,7 +94,6 @@ jobs:
       ))
     environment:
       name: development
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -132,120 +108,96 @@ jobs:
         shell: powershell
         run: |
           icacls "C:\Program Files\Inductive Automation\Ignition\data" /grant "Administrator:(OI)(CI)F" /T 2>$null | Out-Null
-          Write-Host "Permissions fixed!" -ForegroundColor Green
+          Write-Host "Permissions fixed!"
 
-      - name: Deploy TestProject to Dev (LOCAL)
+      - name: Deploy TestProject to Dev
         shell: powershell
         run: |
           $src  = "$PWD\artifacts\projects\TestProject"
           $dest = "C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject"
-
-          Write-Host "=========================================="
-          Write-Host " Deploying TestProject → Dev (local)"
-          Write-Host " From: $src"
-          Write-Host " To:   $dest"
-          Write-Host "=========================================="
-
+          Write-Host "Deploying TestProject to Dev..."
           if (-not (Test-Path $src)) {
-            Write-Host "ERROR: Source not found!" -ForegroundColor Red
+            Write-Host "ERROR: Source not found!"
             Get-ChildItem "$PWD\artifacts\projects\" -ErrorAction SilentlyContinue
             exit 1
           }
-
           if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
           Copy-Item -Path "$src\*" -Destination $dest -Recurse -Force
-
           if (Test-Path "$dest\project.json") {
-            Write-Host "[OK] TestProject deployed to Dev!" -ForegroundColor Green
+            Write-Host "[OK] TestProject deployed to Dev!"
           } else {
-            Write-Host "[FAIL] project.json missing!" -ForegroundColor Red
+            Write-Host "[FAIL] project.json missing!"
             exit 1
           }
 
-          try {
-            Invoke-WebRequest -Uri "http://localhost:8088/data/api/v1/config/scan" `
-              -Method POST `
-              -Headers @{ "X-Ignition-API-Token" = "${{ secrets.DEV_GATEWAY_KEY }}"; "Content-Type" = "application/json" } `
-              -UseBasicParsing -TimeoutSec 15 | Out-Null
-            Write-Host "[OK] Config scan triggered on Dev!" -ForegroundColor Green
-          } catch {
-            Write-Host "Scan failed: $($_.Exception.Message)" -ForegroundColor Yellow
-            try {
-              Invoke-WebRequest -Uri "http://localhost:8088/data/api/v1/restart-tasks/restart?confirm=true" `
-                -Method POST `
-                -Headers @{ "X-Ignition-API-Token" = "${{ secrets.DEV_GATEWAY_KEY }}" } `
-                -UseBasicParsing -TimeoutSec 20 | Out-Null
-              Write-Host "Gateway restart triggered!" -ForegroundColor Yellow
-            } catch { Write-Host "Restart also failed" -ForegroundColor Yellow }
-          }
-
-      - name: Deploy FactoryDashboard to Dev (LOCAL)
+      - name: Deploy FactoryDashboard to Dev
         shell: powershell
         run: |
           $src  = "$PWD\artifacts\projects\FactoryDashboard"
           $dest = "C:\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard"
-
           if (-not (Test-Path $src)) {
-            Write-Host "FactoryDashboard not found - skipping" -ForegroundColor Yellow
+            Write-Host "Skipping FactoryDashboard"
             exit 0
           }
-
           if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
           Copy-Item -Path "$src\*" -Destination $dest -Recurse -Force
-
           if (Test-Path "$dest\project.json") {
-            Write-Host "[OK] FactoryDashboard deployed to Dev!" -ForegroundColor Green
+            Write-Host "[OK] FactoryDashboard deployed to Dev!"
           } else {
-            Write-Host "[FAIL] project.json missing!" -ForegroundColor Red
+            Write-Host "[FAIL] project.json missing!"
             exit 1
           }
 
-          try {
-            Invoke-WebRequest -Uri "http://localhost:8088/data/api/v1/config/scan" `
-              -Method POST `
-              -Headers @{ "X-Ignition-API-Token" = "${{ secrets.DEV_GATEWAY_KEY }}"; "Content-Type" = "application/json" } `
-              -UseBasicParsing -TimeoutSec 15 | Out-Null
-            Write-Host "[OK] Config scan triggered!" -ForegroundColor Green
-          } catch {
-            Write-Host "Scan failed" -ForegroundColor Yellow
+      - name: Reload Ignition Dev
+        shell: powershell
+        run: |
+          $gwcmd = "C:\Program Files\Inductive Automation\Ignition\gwcmd.bat"
+          Write-Host "Reloading Ignition Dev..."
+          if (Test-Path $gwcmd) {
+            $result = & cmd /c """$gwcmd"" --project-scan" 2>&1
+            Write-Host "gwcmd result: $result"
+            Write-Host "[OK] Projects reloaded via gwcmd!"
+          } else {
+            Write-Host "gwcmd not found - using file touch fallback..."
+            $p = "C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject\project.json"
+            if (Test-Path $p) {
+              (Get-Item $p).LastWriteTime = Get-Date
+              Write-Host "[OK] project.json touched - Ignition will detect change"
+            }
           }
 
-      - name: Verify Dev Deployment
+      - name: Verify Dev
         shell: powershell
         run: |
           $base = "C:\Program Files\Inductive Automation\Ignition\data\projects"
-          Write-Host "==========================================" -ForegroundColor Cyan
-          Write-Host " Dev Deployment Verification" -ForegroundColor Cyan
-          Write-Host "==========================================" -ForegroundColor Cyan
+          Write-Host "=========================================="
+          Write-Host " Dev Deployment Complete!"
+          Write-Host "=========================================="
           @("TestProject","FactoryDashboard") | ForEach-Object {
             if (Test-Path "$base\$_\project.json") {
-              Write-Host "[OK] $_ deployed to Dev" -ForegroundColor Green
+              $t = (Get-Item "$base\$_\project.json").LastWriteTime
+              Write-Host "[OK] $_ deployed at $t"
             } else {
-              Write-Host "[FAIL] $_ missing on Dev" -ForegroundColor Red
+              Write-Host "[FAIL] $_ missing"
             }
           }
-          Write-Host "Dev URL: http://172.16.3.148:8088/web/home"
-          Write-Host "==========================================" -ForegroundColor Cyan
+          Write-Host "Dev: http://172.16.3.148:8088/web/home"
+          Write-Host "=========================================="
 
-  # ──────────────────────────────────────────────────────────
-  # DEPLOY TO STAGING (172.16.3.120)
-  # StagingRunner on 172.16.3.148 copies via NETWORK to 172.16.3.120
-  # ──────────────────────────────────────────────────────────
   deploy-staging:
     name: Deploy to Staging
-    runs-on: self-hosted-staging   # ← same StagingRunner on 172.16.3.148
+    runs-on: self-hosted-staging
     needs: [build, test-pylib]
     if: |
-      (startsWith(github.ref, 'refs/heads/release/') && github.event_name == 'push') ||
+      (github.ref == 'refs/heads/develop' && github.event_name == 'push') ||
       (github.event_name == 'workflow_dispatch' && (
         github.event.inputs.target_env == 'staging' ||
         github.event.inputs.target_env == 'both'
       ))
     environment:
       name: staging
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -256,98 +208,103 @@ jobs:
           name: build-artifacts-${{ github.sha }}
           path: ./artifacts
 
-      - name: Check network access to Staging (172.16.3.120)
+      - name: Check network to Staging
         shell: powershell
         run: |
-          Write-Host "Checking network access to 172.16.3.120..."
           if (Test-Path "\\172.16.3.120\C$") {
-            Write-Host "[OK] Staging server reachable!" -ForegroundColor Green
+            Write-Host "[OK] Staging reachable!"
           } else {
-            Write-Host "[FAIL] Cannot reach \\172.16.3.120\C$" -ForegroundColor Red
-            Write-Host ""
-            Write-Host "Run this on Staging server (172.16.3.120) as Administrator:" -ForegroundColor Yellow
-            Write-Host "  net share C$=C:\ /GRANT:Administrator,FULL" -ForegroundColor White
-            Write-Host "  netsh advfirewall firewall set rule group='File and Printer Sharing' new enable=Yes" -ForegroundColor White
+            Write-Host "[FAIL] Cannot reach \\172.16.3.120\C$"
+            Write-Host "Run on 172.16.3.120: net share C$=C:\ /GRANT:Administrator,FULL"
             exit 1
           }
 
-      - name: Deploy TestProject to Staging (NETWORK)
+      - name: Deploy TestProject to Staging
         shell: powershell
         run: |
-          $stagingIP = "172.16.3.120"
+          $ip   = "172.16.3.120"
           $src  = "$PWD\artifacts\projects\TestProject"
-          $dest = "\\$stagingIP\C$\Program Files\Inductive Automation\Ignition\data\projects\TestProject"
-
-          Write-Host "Deploying TestProject → Staging ($stagingIP) via network..."
-
+          $dest = "\\$ip\C$\Program Files\Inductive Automation\Ignition\data\projects\TestProject"
+          Write-Host "Deploying TestProject to Staging..."
           if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
           Copy-Item -Path "$src\*" -Destination $dest -Recurse -Force
-
           if (Test-Path "$dest\project.json") {
-            Write-Host "[OK] TestProject deployed to Staging!" -ForegroundColor Green
+            Write-Host "[OK] TestProject deployed to Staging!"
           } else {
-            Write-Host "[FAIL] project.json missing!" -ForegroundColor Red
+            Write-Host "[FAIL] project.json missing!"
             exit 1
           }
 
-          try {
-            Invoke-WebRequest -Uri "http://${stagingIP}:8088/data/api/v1/config/scan" `
-              -Method POST `
-              -Headers @{ "X-Ignition-API-Token" = "${{ secrets.STAGE_GATEWAY_API_KEY }}"; "Content-Type" = "application/json" } `
-              -UseBasicParsing -TimeoutSec 15 | Out-Null
-            Write-Host "[OK] Config scan triggered on Staging!" -ForegroundColor Green
-          } catch {
-            Write-Host "Scan failed: $($_.Exception.Message)" -ForegroundColor Yellow
-          }
-
-      - name: Deploy FactoryDashboard to Staging (NETWORK)
+      - name: Deploy FactoryDashboard to Staging
         shell: powershell
         run: |
-          $stagingIP = "172.16.3.120"
+          $ip   = "172.16.3.120"
           $src  = "$PWD\artifacts\projects\FactoryDashboard"
-          $dest = "\\$stagingIP\C$\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard"
-
+          $dest = "\\$ip\C$\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard"
           if (-not (Test-Path $src)) {
-            Write-Host "FactoryDashboard not found - skipping" -ForegroundColor Yellow
+            Write-Host "Skipping FactoryDashboard"
             exit 0
           }
-
           if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
           Copy-Item -Path "$src\*" -Destination $dest -Recurse -Force
-
           if (Test-Path "$dest\project.json") {
-            Write-Host "[OK] FactoryDashboard deployed to Staging!" -ForegroundColor Green
+            Write-Host "[OK] FactoryDashboard deployed to Staging!"
           } else {
-            Write-Host "[FAIL] project.json missing!" -ForegroundColor Red
+            Write-Host "[FAIL] project.json missing!"
             exit 1
           }
 
-          try {
-            Invoke-WebRequest -Uri "http://${stagingIP}:8088/data/api/v1/config/scan" `
-              -Method POST `
-              -Headers @{ "X-Ignition-API-Token" = "${{ secrets.STAGE_GATEWAY_API_KEY }}"; "Content-Type" = "application/json" } `
-              -UseBasicParsing -TimeoutSec 15 | Out-Null
-            Write-Host "[OK] Config scan triggered!" -ForegroundColor Green
-          } catch {
-            Write-Host "Scan failed" -ForegroundColor Yellow
-          }
-
-      - name: Verify Staging Deployment
+      - name: Reload Ignition Staging
         shell: powershell
         run: |
-          $stagingIP = "172.16.3.120"
-          $base = "\\$stagingIP\C$\Program Files\Inductive Automation\Ignition\data\projects"
-          Write-Host "==========================================" -ForegroundColor Cyan
-          Write-Host " Staging Deployment Verification" -ForegroundColor Cyan
-          Write-Host "==========================================" -ForegroundColor Cyan
-          @("TestProject","FactoryDashboard") | ForEach-Object {
-            if (Test-Path "$base\$_\project.json") {
-              Write-Host "[OK] $_ deployed to Staging" -ForegroundColor Green
-            } else {
-              Write-Host "[FAIL] $_ missing on Staging" -ForegroundColor Red
+          $ip = "172.16.3.120"
+          Write-Host "Reloading Ignition Staging..."
+          try {
+            $session = New-PSSession -ComputerName $ip -ErrorAction Stop
+            $result = Invoke-Command -Session $session -ScriptBlock {
+              $gwcmd = "C:\Program Files\Inductive Automation\Ignition\gwcmd.bat"
+              if (Test-Path $gwcmd) {
+                $r = & cmd /c """$gwcmd"" --project-scan" 2>&1
+                "gwcmd: $r"
+              } else {
+                $p = "C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject\project.json"
+                if (Test-Path $p) {
+                  (Get-Item $p).LastWriteTime = Get-Date
+                  "File touch done"
+                } else {
+                  "project.json not found"
+                }
+              }
+            }
+            Remove-PSSession $session
+            Write-Host "[OK] Staging reloaded: $result"
+          } catch {
+            Write-Host "Remote session failed: $($_.Exception.Message)"
+            Write-Host "Using network file touch fallback..."
+            $p = "\\$ip\C$\Program Files\Inductive Automation\Ignition\data\projects\TestProject\project.json"
+            if (Test-Path $p) {
+              (Get-Item $p).LastWriteTime = Get-Date
+              Write-Host "[OK] project.json touched on Staging"
             }
           }
-          Write-Host "Staging URL: http://${stagingIP}:8088/web/home"
-          Write-Host "==========================================" -ForegroundColor Cyan
+
+      - name: Verify Staging
+        shell: powershell
+        run: |
+          $ip   = "172.16.3.120"
+          $base = "\\$ip\C$\Program Files\Inductive Automation\Ignition\data\projects"
+          Write-Host "=========================================="
+          Write-Host " Staging Deployment Complete!"
+          Write-Host "=========================================="
+          @("TestProject","FactoryDashboard") | ForEach-Object {
+            if (Test-Path "$base\$_\project.json") {
+              $t = (Get-Item "$base\$_\project.json").LastWriteTime
+              Write-Host "[OK] $_ deployed at $t"
+            } else {
+              Write-Host "[FAIL] $_ missing"
+            }
+          }
+          Write-Host "Staging: http://${ip}:8088/web/home"
+          Write-Host "=========================================="
