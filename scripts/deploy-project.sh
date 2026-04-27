@@ -42,7 +42,6 @@ TAGS_ROOT=$(grep "^tags_root:"    "$CONFIG_FILE" | sed 's/^tags_root:[[:space:]]
 GATEWAY_URL_FROM_CONFIG=$(grep "url:" "$CONFIG_FILE" | head -1 | awk '{print $2}')
 API_KEY_FROM_CONFIG=$(grep "api_key:" "$CONFIG_FILE" | head -1 | awk '{print $2}')
 
-# ─── FIX: eval ki jagah indirect expansion use karo ──────────────────────────
 GATEWAY_URL_ENV_VAR="${ENV_VAR_PREFIX}_GATEWAY_URL"
 GATEWAY_API_KEY_ENV_VAR="${ENV_VAR_PREFIX}_GATEWAY_API_KEY"
 GATEWAY_PASS_ENV_VAR="${ENV_VAR_PREFIX}_GATEWAY_PASS"
@@ -52,6 +51,12 @@ GATEWAY_URL="${!GATEWAY_URL_ENV_VAR}"
 API_KEY="${!GATEWAY_API_KEY_ENV_VAR}"
 GATEWAY_PASS="${!GATEWAY_PASS_ENV_VAR}"
 GATEWAY_USER="${!GATEWAY_USER_ENV_VAR}"
+
+# ─── DEBUG: API_KEY check ─────────────────────────────────────────────────────
+echo "DEBUG: ENV_VAR_PREFIX = $ENV_VAR_PREFIX"
+echo "DEBUG: API_KEY length = ${#API_KEY}"
+echo "DEBUG: API_KEY first 10 = ${API_KEY:0:10}"
+echo "DEBUG: GATEWAY_URL = $GATEWAY_URL"
 # ─────────────────────────────────────────────────────────────────────────────
 
 if [ -z "$GATEWAY_URL" ];  then GATEWAY_URL="$GATEWAY_URL_FROM_CONFIG"; fi
