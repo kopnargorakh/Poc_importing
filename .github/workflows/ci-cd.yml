@@ -119,7 +119,7 @@ jobs:
           path: ./artifacts
 
       - name: Deploy to Development Gateway
-        shell: bash
+        shell: 'C:\Program Files\Git\bin\bash.exe {0}'
         env:
           DEV_GATEWAY_URL: ${{ secrets.DEV_GATEWAY_URL }}
           DEV_GATEWAY_API_KEY: ${{ secrets.DEV_GATEWAY_API_KEY }}
@@ -156,7 +156,7 @@ jobs:
           path: ./artifacts
 
       - name: Deploy to Staging Gateway
-        shell: bash
+        shell: 'C:\Program Files\Git\bin\bash.exe {0}'
         env:
           STAGING_GATEWAY_URL: ${{ secrets.STAGE_GATEWAY_URL }}
           STAGING_GATEWAY_API_KEY: ${{ secrets.STAGE_GATEWAY_API_KEY }}
