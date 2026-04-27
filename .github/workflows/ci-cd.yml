@@ -179,8 +179,8 @@ jobs:
           $env:STAGE_SSH_KEY | Out-File -FilePath "$sshDir\staging_key" -Encoding ascii -NoNewline
           icacls "$sshDir\staging_key" /inheritance:r /grant:r "${env:USERNAME}:F" | Out-Null
 
-          # SCP se files copy karo
-          & "C:\Program Files\Git\bin\scp.exe" -i "$sshDir\staging_key" `
+          # SCP se files copy karo — usr\bin\scp.exe use karo
+          & "C:\Program Files\Git\usr\bin\scp.exe" -i "$sshDir\staging_key" `
             -o StrictHostKeyChecking=no `
             -r "projects/TestProject/." `
             "Administrator@172.16.3.120:/C:/Program Files/Inductive Automation/Ignition/data/projects/TestProject/"
