@@ -119,15 +119,18 @@ jobs:
           path: ./artifacts
 
       - name: Deploy to Development Gateway
-        shell: 'C:\Program Files\Git\bin\bash.exe {0}'
+        shell: powershell
         env:
           DEV_GATEWAY_URL: ${{ secrets.DEV_GATEWAY_URL }}
           DEV_GATEWAY_API_KEY: ${{ secrets.DEV_GATEWAY_API_KEY }}
           DEV_GATEWAY_PASS: ${{ secrets.DEV_GATEWAY_PASS }}
           DEV_GATEWAY_USER: ${{ secrets.DEV_GATEWAY_USER }}
         run: |
-          chmod +x ./scripts/deploy-project.sh
-          ./scripts/deploy-project.sh dev projects/TestProject
+          $env:DEV_GATEWAY_URL     = "${{ secrets.DEV_GATEWAY_URL }}"
+          $env:DEV_GATEWAY_API_KEY = "${{ secrets.DEV_GATEWAY_API_KEY }}"
+          $env:DEV_GATEWAY_PASS    = "${{ secrets.DEV_GATEWAY_PASS }}"
+          $env:DEV_GATEWAY_USER    = "${{ secrets.DEV_GATEWAY_USER }}"
+          & "C:\Program Files\Git\bin\bash.exe" -c "DEV_GATEWAY_URL='$env:DEV_GATEWAY_URL' DEV_GATEWAY_API_KEY='$env:DEV_GATEWAY_API_KEY' DEV_GATEWAY_PASS='$env:DEV_GATEWAY_PASS' DEV_GATEWAY_USER='$env:DEV_GATEWAY_USER' ./scripts/deploy-project.sh dev projects/TestProject"
 
   # ─────────────────────────────────────────────────────────
   # STAGING
@@ -156,7 +159,7 @@ jobs:
           path: ./artifacts
 
       - name: Deploy to Staging Gateway
-        shell: 'C:\Program Files\Git\bin\bash.exe {0}'
+        shell: powershell
         env:
           STAGING_GATEWAY_URL: ${{ secrets.STAGE_GATEWAY_URL }}
           STAGING_GATEWAY_API_KEY: ${{ secrets.STAGE_GATEWAY_API_KEY }}
@@ -164,20 +167,26 @@ jobs:
           STAGING_GATEWAY_USER: ${{ secrets.STAGGING_GATEWAY_USER }}
           STAGE_SSH_KEY: ${{ secrets.STAGE_SSH_KEY }}
         run: |
-          # SSH key setup
-          mkdir -p ~/.ssh
-          echo "$STAGE_SSH_KEY" > ~/.ssh/staging_key
-          chmod 600 ~/.ssh/staging_key
+          $env:STAGING_GATEWAY_URL     = "${{ secrets.STAGE_GATEWAY_URL }}"
+          $env:STAGING_GATEWAY_API_KEY = "${{ secrets.STAGE_GATEWAY_API_KEY }}"
+          $env:STAGING_GATEWAY_PASS    = "${{ secrets.STAGE_GATEWAY_PASS }}"
+          $env:STAGING_GATEWAY_USER    = "${{ secrets.STAGGING_GATEWAY_USER }}"
+          $env:STAGE_SSH_KEY           = "${{ secrets.STAGE_SSH_KEY }}"
 
-          # Files SCP se staging pe copy karo
-          scp -i ~/.ssh/staging_key \
-            -o StrictHostKeyChecking=no \
-            -r projects/TestProject/. \
+          # SSH key setup
+          $sshDir = "$env:USERPROFILE\.ssh"
+          New-Item -ItemType Directory -Force -Path $sshDir | Out-Null
+          $env:STAGE_SSH_KEY | Out-File -FilePath "$sshDir\staging_key" -Encoding ascii -NoNewline
+          icacls "$sshDir\staging_key" /inheritance:r /grant:r "${env:USERNAME}:F" | Out-Null
+
+          # SCP se files copy karo
+          & "C:\Program Files\Git\bin\scp.exe" -i "$sshDir\staging_key" `
+            -o StrictHostKeyChecking=no `
+            -r "projects/TestProject/." `
             "Administrator@172.16.3.120:/C:/Program Files/Inductive Automation/Ignition/data/projects/TestProject/"
 
           # API scan karo
-          chmod +x ./scripts/deploy-project.sh
-          ./scripts/deploy-project.sh staging projects/TestProject
+          & "C:\Program Files\Git\bin\bash.exe" -c "STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' STAGING_GATEWAY_USER='$env:STAGING_GATEWAY_USER' ./scripts/deploy-project.sh staging projects/TestProject"
 
           # Cleanup
-          rm -f ~/.ssh/staging_key
+          Remove-Item "$sshDir\staging_key" -Force -ErrorAction SilentlyContinue
