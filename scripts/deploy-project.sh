@@ -124,8 +124,8 @@ EOF
   echo "Reloading tags..."
   TAGS_RELOAD_SUCCESS=false
 
-  # Option 1: Scan API
-  if [ -n "$API_KEY" ]; then
+  # Option 1: Scan API (dev + staging dono ke liye)
+  if [ -n "$API_KEY" ] && { [ "$ENVIRONMENT" = "dev" ] || [ "$ENVIRONMENT" = "staging" ]; }; then
     echo "  - Trying scan API..."
     TAGS_SCAN_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
       -H "X-Ignition-API-Token: $API_KEY" \
@@ -160,7 +160,6 @@ EOF
       fi
     fi
   fi
-  # ─────────────────────────────────────────────────────────────────────────
 
 else
   echo "  ℹ No tags file or tags_root not configured — skipping tags"
@@ -180,8 +179,8 @@ echo ""
 echo "Reloading Ignition resources..."
 SCAN_SUCCESS=false
 
-# Option 1: Scan API
-if [ -n "$API_KEY" ]; then
+# Option 1: Scan API (dev + staging dono ke liye)
+if [ -n "$API_KEY" ] && { [ "$ENVIRONMENT" = "dev" ] || [ "$ENVIRONMENT" = "staging" ]; }; then
   echo "  - Trying scan API..."
 
   CONFIG_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
