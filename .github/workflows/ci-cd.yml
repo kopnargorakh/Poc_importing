@@ -10,9 +10,23 @@ on:
   push:
     branches:
       - develop
+      - release/*
   pull_request:
     branches:
       - develop
+
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Target environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - both
+
 env:
   BUILD_CONFIGURATION: Release
 jobs:
@@ -53,7 +67,9 @@ jobs:
             build/
             scripts/
             config/
+            projects/
             migrations/
+
   test-pylib:
     name: Test Python Libraries
     runs-on: ubuntu-latest
@@ -68,11 +84,18 @@ jobs:
         run: |
           chmod +x ./scripts/test-pylib.sh
           ./scripts/test-pylib.sh pylib/Mustry/Tests
+
+  # ── DEVELOPMENT — UNCHANGED from your working script ──────
   deploy-dev:
     name: Deploy to Development
     runs-on: self-hosted
     needs: [build, test-pylib]
-    if: github.ref == 'refs/heads/develop'
+    if: |
+      (github.ref == 'refs/heads/develop' && github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch' && (
+        github.event.inputs.target_env == 'dev' ||
+        github.event.inputs.target_env == 'both'
+      ))
     environment:
       name: development
     steps:
@@ -86,13 +109,49 @@ jobs:
       - name: Deploy to Development Gateway
         shell: powershell
         run: |
-          $env:DEV_GATEWAY_URL = "${{ secrets.DEV_GATEWAY_URL }}"
+          $env:DEV_GATEWAY_URL     = "${{ secrets.DEV_GATEWAY_URL }}"
           $env:DEV_GATEWAY_API_KEY = "${{ secrets.DEV_GATEWAY_API_KEY }}"
-          $env:DEV_GATEWAY_PASS = "${{ secrets.DEV_GATEWAY_PASS }}"
-          $env:DEV_GATEWAY_USER = "${{ secrets.DEV_GATEWAY_USER }}"
+          $env:DEV_GATEWAY_PASS    = "${{ secrets.DEV_GATEWAY_PASS }}"
+          $env:DEV_GATEWAY_USER    = "${{ secrets.DEV_GATEWAY_USER }}"
           & "C:\Program Files\Git\bin\bash.exe" -c "DEV_GATEWAY_URL='$env:DEV_GATEWAY_URL' DEV_GATEWAY_API_KEY='$env:DEV_GATEWAY_API_KEY' DEV_GATEWAY_PASS='$env:DEV_GATEWAY_PASS' DEV_GATEWAY_USER='$env:DEV_GATEWAY_USER' ./scripts/deploy-project.sh dev projects/TestProject"
         env:
-          DEV_GATEWAY_URL: ${{ secrets.DEV_GATEWAY_URL }}
+          DEV_GATEWAY_URL:     ${{ secrets.DEV_GATEWAY_URL }}
           DEV_GATEWAY_API_KEY: ${{ secrets.DEV_GATEWAY_API_KEY }}
-          DEV_GATEWAY_PASS: ${{ secrets.DEV_GATEWAY_PASS }}
-          DEV_GATEWAY_USER: ${{ secrets.DEV_GATEWAY_USER }}
+          DEV_GATEWAY_PASS:    ${{ secrets.DEV_GATEWAY_PASS }}
+          DEV_GATEWAY_USER:    ${{ secrets.DEV_GATEWAY_USER }}
+
+  # ── STAGING — same pattern, runner on 172.16.3.120 ────────
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: self-hosted-staging
+    needs: [build, test-pylib]
+    if: |
+      (github.ref == 'refs/heads/develop' && github.event_name == 'push') ||
+      (startsWith(github.ref, 'refs/heads/release/') && github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch' && (
+        github.event.inputs.target_env == 'staging' ||
+        github.event.inputs.target_env == 'both'
+      ))
+    environment:
+      name: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts-${{ github.sha }}
+          path: ./artifacts
+      - name: Deploy to Staging Gateway
+        shell: powershell
+        run: |
+          $env:STAGING_GATEWAY_URL     = "${{ secrets.STAGE_GATEWAY_URL }}"
+          $env:STAGING_GATEWAY_API_KEY = "${{ secrets.STAGE_GATEWAY_API_KEY }}"
+          $env:STAGING_GATEWAY_PASS    = "${{ secrets.STAGE_GATEWAY_PASS }}"
+          $env:STAGING_GATEWAY_USER    = "${{ secrets.STAGGING_GATEWAY_USER }}"
+          & "C:\Program Files\Git\bin\bash.exe" -c "STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' STAGING_GATEWAY_USER='$env:STAGING_GATEWAY_USER' ./scripts/deploy-project.sh staging projects/TestProject"
+        env:
+          STAGING_GATEWAY_URL:     ${{ secrets.STAGE_GATEWAY_URL }}
+          STAGING_GATEWAY_API_KEY: ${{ secrets.STAGE_GATEWAY_API_KEY }}
+          STAGING_GATEWAY_PASS:    ${{ secrets.STAGE_GATEWAY_PASS }}
+          STAGING_GATEWAY_USER:    ${{ secrets.STAGGING_GATEWAY_USER }}
