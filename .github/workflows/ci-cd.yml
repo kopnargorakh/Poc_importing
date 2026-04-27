@@ -123,7 +123,7 @@ jobs:
   # ── STAGING — same pattern, runner on 172.16.3.120 ────────
   deploy-staging:
     name: Deploy to Staging
-    runs-on: self-hosted-staging
+    runs-on: self-hosted
     needs: [build, test-pylib]
     if: |
       (github.ref == 'refs/heads/develop' && github.event_name == 'push') ||
