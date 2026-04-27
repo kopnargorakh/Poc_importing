@@ -42,10 +42,17 @@ TAGS_ROOT=$(grep "^tags_root:"    "$CONFIG_FILE" | sed 's/^tags_root:[[:space:]]
 GATEWAY_URL_FROM_CONFIG=$(grep "url:" "$CONFIG_FILE" | head -1 | awk '{print $2}')
 API_KEY_FROM_CONFIG=$(grep "api_key:" "$CONFIG_FILE" | head -1 | awk '{print $2}')
 
-GATEWAY_URL="$(eval echo \$${ENV_VAR_PREFIX}_GATEWAY_URL)"
-API_KEY="$(eval    echo \$${ENV_VAR_PREFIX}_GATEWAY_API_KEY)"
-GATEWAY_PASS="$(eval echo \$${ENV_VAR_PREFIX}_GATEWAY_PASS)"
-GATEWAY_USER="$(eval echo \$${ENV_VAR_PREFIX}_GATEWAY_USER)"
+# ─── FIX: eval ki jagah indirect expansion use karo ──────────────────────────
+GATEWAY_URL_ENV_VAR="${ENV_VAR_PREFIX}_GATEWAY_URL"
+GATEWAY_API_KEY_ENV_VAR="${ENV_VAR_PREFIX}_GATEWAY_API_KEY"
+GATEWAY_PASS_ENV_VAR="${ENV_VAR_PREFIX}_GATEWAY_PASS"
+GATEWAY_USER_ENV_VAR="${ENV_VAR_PREFIX}_GATEWAY_USER"
+
+GATEWAY_URL="${!GATEWAY_URL_ENV_VAR}"
+API_KEY="${!GATEWAY_API_KEY_ENV_VAR}"
+GATEWAY_PASS="${!GATEWAY_PASS_ENV_VAR}"
+GATEWAY_USER="${!GATEWAY_USER_ENV_VAR}"
+# ─────────────────────────────────────────────────────────────────────────────
 
 if [ -z "$GATEWAY_URL" ];  then GATEWAY_URL="$GATEWAY_URL_FROM_CONFIG"; fi
 if [ -z "$API_KEY" ];      then API_KEY="$API_KEY_FROM_CONFIG";         fi
@@ -119,13 +126,12 @@ EOF
     echo "  ✓ unary-resource.json created (default)"
   fi
 
-  # ─── Tags reload: pehle scan API, phir WebDev fallback ───────────────────
   echo ""
   echo "Reloading tags..."
   TAGS_RELOAD_SUCCESS=false
 
-  # Option 1: Scan API (dev + staging dono ke liye)
-  if [ -n "$API_KEY" ] && { [ "$ENVIRONMENT" = "dev" ] || [ "$ENVIRONMENT" = "staging" ]; }; then
+  # Option 1: Scan API
+  if [ -n "$API_KEY" ]; then
     echo "  - Trying scan API..."
     TAGS_SCAN_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
       -H "X-Ignition-API-Token: $API_KEY" \
@@ -179,8 +185,8 @@ echo ""
 echo "Reloading Ignition resources..."
 SCAN_SUCCESS=false
 
-# Option 1: Scan API (dev + staging dono ke liye)
-if [ -n "$API_KEY" ] && { [ "$ENVIRONMENT" = "dev" ] || [ "$ENVIRONMENT" = "staging" ]; }; then
+# Option 1: Scan API
+if [ -n "$API_KEY" ]; then
   echo "  - Trying scan API..."
 
   CONFIG_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
