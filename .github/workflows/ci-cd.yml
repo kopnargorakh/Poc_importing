@@ -1,11 +1,13 @@
 # GitHub Actions CI/CD Pipeline for Ignition 8.3
-# Development only deployment
 name: CI/CD Pipeline
+
 permissions:
   contents: read
+
 concurrency:
   group: ci-cd-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
 on:
   push:
     branches:
@@ -29,6 +31,7 @@ on:
 
 env:
   BUILD_CONFIGURATION: Release
+
 jobs:
   build:
     name: Build and Validate
@@ -36,10 +39,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Validate Project Names and Structure
         run: |
           chmod +x ./scripts/validate-names.sh
           ./scripts/validate-names.sh ./projects
+
       - name: Package All Projects
         run: |
           set -e
@@ -58,6 +63,7 @@ jobs:
             done
           fi
           ls -lh build/
+
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -76,16 +82,20 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
       - name: Run pylib tests
         run: |
           chmod +x ./scripts/test-pylib.sh
           ./scripts/test-pylib.sh pylib/Mustry/Tests
 
-  # ── DEVELOPMENT — UNCHANGED from your working script ──────
+  # ─────────────────────────────────────────────────────────
+  # DEVELOPMENT
+  # ─────────────────────────────────────────────────────────
   deploy-dev:
     name: Deploy to Development
     runs-on: self-hosted
@@ -101,26 +111,27 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
         with:
           name: build-artifacts-${{ github.sha }}
           path: ./artifacts
-      - name: Deploy to Development Gateway
-        shell: powershell
-        run: |
-          $env:DEV_GATEWAY_URL     = "${{ secrets.DEV_GATEWAY_URL }}"
-          $env:DEV_GATEWAY_API_KEY = "${{ secrets.DEV_GATEWAY_API_KEY }}"
-          $env:DEV_GATEWAY_PASS    = "${{ secrets.DEV_GATEWAY_PASS }}"
-          $env:DEV_GATEWAY_USER    = "${{ secrets.DEV_GATEWAY_USER }}"
-          & "C:\Program Files\Git\bin\bash.exe" -c "DEV_GATEWAY_URL='$env:DEV_GATEWAY_URL' DEV_GATEWAY_API_KEY='$env:DEV_GATEWAY_API_KEY' DEV_GATEWAY_PASS='$env:DEV_GATEWAY_PASS' DEV_GATEWAY_USER='$env:DEV_GATEWAY_USER' ./scripts/deploy-project.sh dev projects/TestProject"
-        env:
-          DEV_GATEWAY_URL:     ${{ secrets.DEV_GATEWAY_URL }}
-          DEV_GATEWAY_API_KEY: ${{ secrets.DEV_GATEWAY_API_KEY }}
-          DEV_GATEWAY_PASS:    ${{ secrets.DEV_GATEWAY_PASS }}
-          DEV_GATEWAY_USER:    ${{ secrets.DEV_GATEWAY_USER }}
 
-  # ── STAGING — same pattern, runner on 172.16.3.120 ────────
+      - name: Deploy to Development Gateway
+        shell: bash
+        env:
+          DEV_GATEWAY_URL: ${{ secrets.DEV_GATEWAY_URL }}
+          DEV_GATEWAY_API_KEY: ${{ secrets.DEV_GATEWAY_API_KEY }}
+          DEV_GATEWAY_PASS: ${{ secrets.DEV_GATEWAY_PASS }}
+          DEV_GATEWAY_USER: ${{ secrets.DEV_GATEWAY_USER }}
+        run: |
+          chmod +x ./scripts/deploy-project.sh
+          ./scripts/deploy-project.sh dev projects/TestProject
+
+  # ─────────────────────────────────────────────────────────
+  # STAGING
+  # ─────────────────────────────────────────────────────────
   deploy-staging:
     name: Deploy to Staging
     runs-on: self-hosted
@@ -137,21 +148,36 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
         with:
           name: build-artifacts-${{ github.sha }}
           path: ./artifacts
+
       - name: Deploy to Staging Gateway
-        shell: powershell
-        run: |
-          $env:STAGING_GATEWAY_URL     = "${{ secrets.STAGE_GATEWAY_URL }}"
-          $env:STAGING_GATEWAY_API_KEY = "${{ secrets.STAGE_GATEWAY_API_KEY }}"
-          $env:STAGING_GATEWAY_PASS    = "${{ secrets.STAGE_GATEWAY_PASS }}"
-          $env:STAGING_GATEWAY_USER    = "${{ secrets.STAGGING_GATEWAY_USER }}"
-          & "C:\Program Files\Git\bin\bash.exe" -c "STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' STAGING_GATEWAY_USER='$env:STAGING_GATEWAY_USER' ./scripts/deploy-project.sh staging projects/TestProject"
+        shell: bash
         env:
-          STAGING_GATEWAY_URL:     ${{ secrets.STAGE_GATEWAY_URL }}
+          STAGING_GATEWAY_URL: ${{ secrets.STAGE_GATEWAY_URL }}
           STAGING_GATEWAY_API_KEY: ${{ secrets.STAGE_GATEWAY_API_KEY }}
-          STAGING_GATEWAY_PASS:    ${{ secrets.STAGE_GATEWAY_PASS }}
-          STAGING_GATEWAY_USER:    ${{ secrets.STAGGING_GATEWAY_USER }}
+          STAGING_GATEWAY_PASS: ${{ secrets.STAGE_GATEWAY_PASS }}
+          STAGING_GATEWAY_USER: ${{ secrets.STAGGING_GATEWAY_USER }}
+          STAGE_SSH_KEY: ${{ secrets.STAGE_SSH_KEY }}
+        run: |
+          # SSH key setup
+          mkdir -p ~/.ssh
+          echo "$STAGE_SSH_KEY" > ~/.ssh/staging_key
+          chmod 600 ~/.ssh/staging_key
+
+          # Files SCP se staging pe copy karo
+          scp -i ~/.ssh/staging_key \
+            -o StrictHostKeyChecking=no \
+            -r projects/TestProject/. \
+            "Administrator@172.16.3.120:C:/Program Files/Inductive Automation/Ignition/data/projects/TestProject/"
+
+          # API scan karo
+          chmod +x ./scripts/deploy-project.sh
+          ./scripts/deploy-project.sh staging projects/TestProject
+
+          # Cleanup
+          rm -f ~/.ssh/staging_key
