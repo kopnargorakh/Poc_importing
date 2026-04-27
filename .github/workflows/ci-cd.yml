@@ -1,4 +1,7 @@
 # GitHub Actions CI/CD Pipeline for Ignition 8.3
+# ONE RUNNER — StagingRunner on 172.16.3.148
+# Dev:     copies locally
+# Staging: copies via network using credentials
 name: CI/CD Pipeline
 permissions:
   contents: read
@@ -86,7 +89,7 @@ jobs:
           ./scripts/test-pylib.sh pylib/Mustry/Tests
 
   # ─────────────────────────────────────────────────────────
-  # DEVELOPMENT
+  # DEVELOPMENT — copies locally on 172.16.3.148
   # ─────────────────────────────────────────────────────────
   deploy-dev:
     name: Deploy to Development
@@ -110,12 +113,12 @@ jobs:
           name: build-artifacts-${{ github.sha }}
           path: ./artifacts
 
-      - name: Fix Ignition Permissions
+      - name: Fix Ignition Permissions on Dev
         shell: powershell
         run: |
           icacls "C:\Program Files\Inductive Automation\Ignition\data" /grant "Everyone:(OI)(CI)F" /T 2>$null | Out-Null
           icacls "C:\Program Files\Inductive Automation\Ignition\data\projects" /grant "Everyone:(OI)(CI)F" /T 2>$null | Out-Null
-          Write-Host "Permissions fixed!"
+          Write-Host "Dev permissions fixed!"
 
       - name: Deploy to Development Gateway
         shell: powershell
@@ -132,7 +135,11 @@ jobs:
           DEV_GATEWAY_USER:    ${{ secrets.DEV_GATEWAY_USER }}
 
   # ─────────────────────────────────────────────────────────
-  # STAGING
+  # STAGING — copies via network to 172.16.3.120
+  # Uses net use with credentials to authenticate
+  # Secrets needed:
+  #   STAGE_SERVER_USER ← Administrator
+  #   STAGE_SERVER_PASS ← password of 172.16.3.120
   # ─────────────────────────────────────────────────────────
   deploy-staging:
     name: Deploy to Staging
@@ -157,30 +164,64 @@ jobs:
           name: build-artifacts-${{ github.sha }}
           path: ./artifacts
 
+      - name: Connect to Staging server
+        shell: powershell
+        run: |
+          $ip   = "172.16.3.120"
+          $user = "${{ secrets.STAGE_SERVER_USER }}"
+          $pass = "${{ secrets.STAGE_SERVER_PASS }}"
+          Write-Host "Connecting to staging server $ip..."
+          net use "\\$ip\C$" $pass /user:$user /persistent:no
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "[OK] Connected to staging server!"
+          } else {
+            Write-Host "[FAIL] Cannot connect to staging server!"
+            exit 1
+          }
+
       - name: Fix Ignition Permissions on Staging
         shell: powershell
-        continue-on-error: true  
         run: |
           $ip = "172.16.3.120"
-          $path1 = "\\$ip\C$\Program Files\Inductive Automation\Ignition\data"
-          $path2 = "\\$ip\C$\Program Files\Inductive Automation\Ignition\data\projects"
-          if (Test-Path $path1) {
-            icacls $path1 /grant "Everyone:(OI)(CI)F" /T 2>$null | Out-Null
-            icacls $path2 /grant "Everyone:(OI)(CI)F" /T 2>$null | Out-Null
-            Write-Host "Staging permissions fixed!"
-          } else {
-            Write-Host "Staging not reachable via network - deploying locally"
-          }
+          icacls "\\$ip\C$\Program Files\Inductive Automation\Ignition\data" /grant "Everyone:(OI)(CI)F" /T 2>$null | Out-Null
+          Write-Host "Staging permissions fixed!"
 
       - name: Deploy to Staging Gateway
         shell: powershell
         run: |
-          $env:STAGING_GATEWAY_URL     = "${{ secrets.STAGE_GATEWAY_URL }}"
-          $env:STAGING_GATEWAY_API_KEY = "${{ secrets.STAGE_GATEWAY_API_KEY }}"
-          $env:STAGING_GATEWAY_PASS    = "${{ secrets.STAGE_GATEWAY_PASS }}"
-          $env:STAGING_GATEWAY_USER    = "admin"
-          & "C:\Program Files\Git\bin\bash.exe" -c "STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' STAGING_GATEWAY_USER='$env:STAGING_GATEWAY_USER' ./scripts/deploy-project.sh staging projects/TestProject"
-        env:
-          STAGING_GATEWAY_URL:     ${{ secrets.STAGE_GATEWAY_URL }}
-          STAGING_GATEWAY_API_KEY: ${{ secrets.STAGE_GATEWAY_API_KEY }}
-          STAGING_GATEWAY_PASS:    ${{ secrets.STAGE_GATEWAY_PASS }}
+          $ip  = "172.16.3.120"
+          $src = "$PWD\artifacts\projects\TestProject"
+          $dest = "\\$ip\C$\Program Files\Inductive Automation\Ignition\data\projects\TestProject"
+          Write-Host "Deploying TestProject to Staging ($ip)..."
+          if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item -Path "$src\*" -Destination $dest -Recurse -Force
+          if (Test-Path "$dest\project.json") {
+            Write-Host "[OK] TestProject deployed to Staging!"
+          } else {
+            Write-Host "[FAIL] Deployment failed!"
+            exit 1
+          }
+
+      - name: Deploy FactoryDashboard to Staging
+        shell: powershell
+        run: |
+          $ip   = "172.16.3.120"
+          $src  = "$PWD\artifacts\projects\FactoryDashboard"
+          $dest = "\\$ip\C$\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard"
+          if (-not (Test-Path $src)) { Write-Host "Skipping FactoryDashboard"; exit 0 }
+          if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item -Path "$src\*" -Destination $dest -Recurse -Force
+          if (Test-Path "$dest\project.json") {
+            Write-Host "[OK] FactoryDashboard deployed to Staging!"
+          } else {
+            Write-Host "[FAIL]"; exit 1
+          }
+
+      - name: Disconnect from Staging
+        shell: powershell
+        if: always()
+        run: |
+          net use "\\172.16.3.120\C$" /delete /yes 2>$null | Out-Null
+          Write-Host "Disconnected from staging server"
