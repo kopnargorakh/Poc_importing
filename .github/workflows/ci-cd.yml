@@ -173,8 +173,8 @@ jobs:
           $env:STAGING_GATEWAY_USER    = "${{ secrets.STAGGING_GATEWAY_USER }}"
           $env:STAGE_SSH_KEY           = "${{ secrets.STAGE_SSH_KEY }}"
 
-          # SSH key setup — Unix line endings ke saath save karo
-          $sshDir = "$env:USERPROFILE\.ssh"
+          # SSH key setup — Unix line endings ke saath
+          $sshDir = "C:\Users\Administrator\.ssh"
           New-Item -ItemType Directory -Force -Path $sshDir | Out-Null
           [System.IO.File]::WriteAllText(
             "$sshDir\staging_key",
@@ -185,8 +185,8 @@ jobs:
           # SCP se files staging pe copy karo
           & "C:\Program Files\Git\usr\bin\scp.exe" -i "$sshDir\staging_key" `
             -o StrictHostKeyChecking=no `
-            -r "projects/TestProject/." `
-            "Administrator@172.16.3.120:/C:/Program Files/Inductive Automation/Ignition/data/projects/TestProject/"
+            -r "C:/Users/Administrator/Poc_importing/projects/TestProject" `
+            "Administrator@172.16.3.120:/C:/Program Files/Inductive Automation/Ignition/data/projects/"
 
           # API scan karo
           & "C:\Program Files\Git\bin\bash.exe" -c "STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' STAGING_GATEWAY_USER='$env:STAGING_GATEWAY_USER' ./scripts/deploy-project.sh staging projects/TestProject"
