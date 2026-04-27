@@ -165,31 +165,20 @@ jobs:
           STAGING_GATEWAY_API_KEY: ${{ secrets.STAGE_GATEWAY_API_KEY }}
           STAGING_GATEWAY_PASS: ${{ secrets.STAGE_GATEWAY_PASS }}
           STAGING_GATEWAY_USER: ${{ secrets.STAGGING_GATEWAY_USER }}
-          STAGE_SSH_KEY: ${{ secrets.STAGE_SSH_KEY }}
         run: |
           $env:STAGING_GATEWAY_URL     = "${{ secrets.STAGE_GATEWAY_URL }}"
           $env:STAGING_GATEWAY_API_KEY = "${{ secrets.STAGE_GATEWAY_API_KEY }}"
           $env:STAGING_GATEWAY_PASS    = "${{ secrets.STAGE_GATEWAY_PASS }}"
           $env:STAGING_GATEWAY_USER    = "${{ secrets.STAGGING_GATEWAY_USER }}"
-          $env:STAGE_SSH_KEY           = "${{ secrets.STAGE_SSH_KEY }}"
 
-          # SSH key setup — gorakh user path
-          $sshDir = "C:\Users\gorakh\.ssh"
-          New-Item -ItemType Directory -Force -Path $sshDir | Out-Null
-          [System.IO.File]::WriteAllText(
-            "$sshDir\staging_key",
-            $env:STAGE_SSH_KEY.Replace("`r`n", "`n").Replace("`r", "`n")
-          )
-          icacls "$sshDir\staging_key" /inheritance:r /grant:r "gorakh:F" | Out-Null
+          # SSH key — pehle se dev machine pe maujood file use karo
+          $sshKeyPath = "C:\Users\gorakh\.ssh\staging_key"
 
           # SCP se files staging pe copy karo
-          & "C:\Program Files\Git\usr\bin\scp.exe" -i "$sshDir\staging_key" `
+          & "C:\Program Files\Git\usr\bin\scp.exe" -i $sshKeyPath `
             -o StrictHostKeyChecking=no `
             -r "C:/Users/Administrator/Poc_importing/projects/TestProject" `
             "Administrator@172.16.3.120:/C:/Program Files/Inductive Automation/Ignition/data/projects/"
 
           # API scan karo
           & "C:\Program Files\Git\bin\bash.exe" -c "STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' STAGING_GATEWAY_USER='$env:STAGING_GATEWAY_USER' ./scripts/deploy-project.sh staging projects/TestProject"
-
-          # Cleanup
-          Remove-Item "$sshDir\staging_key" -Force -ErrorAction SilentlyContinue
