@@ -1,7 +1,7 @@
 # GitHub Actions CI/CD Pipeline for Ignition 8.3
-# Uses gateway credentials for deployment - no network share needed
-# Dev:     deploy-project.sh dev     → http://172.16.3.148:8088
-# Staging: deploy-project.sh staging → http://172.16.3.120:8088
+# ONE RUNNER on 172.16.3.148 (StagingRunner)
+# Dev:     deploy locally via deploy-project.sh
+# Staging: copy files via SCP + SSH to 172.16.3.120
 name: CI/CD Pipeline
 permissions:
   contents: read
@@ -88,10 +88,6 @@ jobs:
           chmod +x ./scripts/test-pylib.sh
           ./scripts/test-pylib.sh pylib/Mustry/Tests
 
-  # ─────────────────────────────────────────────────────────
-  # DEVELOPMENT
-  # Uses: DEV_GATEWAY_URL, DEV_GATEWAY_API_KEY, DEV_GATEWAY_PASS, DEV_GATEWAY_USER
-  # ─────────────────────────────────────────────────────────
   deploy-dev:
     name: Deploy to Development
     runs-on: self-hosted-staging
@@ -132,11 +128,6 @@ jobs:
           DEV_GATEWAY_PASS:    ${{ secrets.DEV_GATEWAY_PASS }}
           DEV_GATEWAY_USER:    ${{ secrets.DEV_GATEWAY_USER }}
 
-  # ─────────────────────────────────────────────────────────
-  # STAGING
-  # Uses: STAGE_GATEWAY_URL, STAGE_GATEWAY_API_KEY, STAGE_GATEWAY_PASS
-  # No network share needed - connects via Ignition gateway HTTP
-  # ─────────────────────────────────────────────────────────
   deploy-staging:
     name: Deploy to Staging
     runs-on: self-hosted-staging
@@ -153,20 +144,44 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
         with:
           name: build-artifacts-${{ github.sha }}
           path: ./artifacts
-      - name: Deploy to Staging Gateway
-        shell: powershell
+
+      - name: Fix permissions on Staging via SSH
+        shell: cmd
         run: |
-          $env:STAGING_GATEWAY_URL     = "${{ secrets.STAGE_GATEWAY_URL }}"
-          $env:STAGING_GATEWAY_API_KEY = "${{ secrets.STAGE_GATEWAY_API_KEY }}"
-          $env:STAGING_GATEWAY_PASS    = "${{ secrets.STAGE_GATEWAY_PASS }}"
-          $env:STAGING_GATEWAY_USER    = "admin"
-          & "C:\Program Files\Git\bin\bash.exe" -c "STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' STAGING_GATEWAY_USER='$env:STAGING_GATEWAY_USER' ./scripts/deploy-project.sh staging projects/TestProject"
-        env:
-          STAGING_GATEWAY_URL:     ${{ secrets.STAGE_GATEWAY_URL }}
-          STAGING_GATEWAY_API_KEY: ${{ secrets.STAGE_GATEWAY_API_KEY }}
-          STAGING_GATEWAY_PASS:    ${{ secrets.STAGE_GATEWAY_PASS }}
+          ssh -i "C:\actions-runner-staging\.ssh\id_rsa" -o StrictHostKeyChecking=no Administrator@172.16.3.120 "icacls \"C:\Program Files\Inductive Automation\Ignition\data\" /grant Everyone:(OI)(CI)F /T"
+          echo Permissions fixed on Staging!
+
+      - name: Remove old TestProject on Staging
+        shell: cmd
+        run: |
+          ssh -i "C:\actions-runner-staging\.ssh\id_rsa" -o StrictHostKeyChecking=no Administrator@172.16.3.120 "if exist \"C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject\" rmdir /S /Q \"C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject\""
+          echo Old TestProject removed!
+
+      - name: Copy TestProject to Staging via SCP
+        shell: cmd
+        run: |
+          scp -i "C:\actions-runner-staging\.ssh\id_rsa" -o StrictHostKeyChecking=no -r "artifacts\projects\TestProject" "Administrator@172.16.3.120:C:\Program Files\Inductive Automation\Ignition\data\projects\"
+          echo TestProject copied to Staging!
+
+      - name: Copy FactoryDashboard to Staging via SCP
+        shell: cmd
+        run: |
+          if exist "artifacts\projects\FactoryDashboard" (
+            ssh -i "C:\actions-runner-staging\.ssh\id_rsa" -o StrictHostKeyChecking=no Administrator@172.16.3.120 "if exist \"C:\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard\" rmdir /S /Q \"C:\Program Files\Inductive Automation\Ignition\data\projects\FactoryDashboard\""
+            scp -i "C:\actions-runner-staging\.ssh\id_rsa" -o StrictHostKeyChecking=no -r "artifacts\projects\FactoryDashboard" "Administrator@172.16.3.120:C:\Program Files\Inductive Automation\Ignition\data\projects\"
+            echo FactoryDashboard copied to Staging!
+          ) else (
+            echo FactoryDashboard not found - skipping
+          )
+
+      - name: Verify Staging Deployment
+        shell: cmd
+        run: |
+          ssh -i "C:\actions-runner-staging\.ssh\id_rsa" -o StrictHostKeyChecking=no Administrator@172.16.3.120 "if exist \"C:\Program Files\Inductive Automation\Ignition\data\projects\TestProject\project.json\" (echo [OK] TestProject deployed!) else (echo [FAIL] TestProject missing!)"
+          echo Staging URL: http://172.16.3.120:8088/web/home
