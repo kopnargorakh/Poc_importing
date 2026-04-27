@@ -159,6 +159,7 @@ jobs:
 
       - name: Fix Ignition Permissions on Staging
         shell: powershell
+        continue-on-error: true  
         run: |
           $ip = "172.16.3.120"
           $path1 = "\\$ip\C$\Program Files\Inductive Automation\Ignition\data"
