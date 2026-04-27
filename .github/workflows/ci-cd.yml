@@ -1,5 +1,4 @@
 # GitHub Actions CI/CD Pipeline for Ignition 8.3
-# Development only deployment
 name: CI/CD Pipeline
 permissions:
   contents: read
@@ -29,6 +28,7 @@ on:
 
 env:
   BUILD_CONFIGURATION: Release
+
 jobs:
   build:
     name: Build and Validate
@@ -86,11 +86,11 @@ jobs:
           ./scripts/test-pylib.sh pylib/Mustry/Tests
 
   # ─────────────────────────────────────────────────────────
-  # DEVELOPMENT — 100% UNCHANGED from your working script
+  # DEVELOPMENT
   # ─────────────────────────────────────────────────────────
   deploy-dev:
     name: Deploy to Development
-    runs-on: self-hosted
+    runs-on: self-hosted-staging
     needs: [build, test-pylib]
     if: |
       (github.ref == 'refs/heads/develop' && github.event_name == 'push') ||
@@ -103,11 +103,20 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
         with:
           name: build-artifacts-${{ github.sha }}
           path: ./artifacts
+
+      - name: Fix Ignition Permissions
+        shell: powershell
+        run: |
+          icacls "C:\Program Files\Inductive Automation\Ignition\data" /grant "Everyone:(OI)(CI)F" /T 2>$null | Out-Null
+          icacls "C:\Program Files\Inductive Automation\Ignition\data\projects" /grant "Everyone:(OI)(CI)F" /T 2>$null | Out-Null
+          Write-Host "Permissions fixed!"
+
       - name: Deploy to Development Gateway
         shell: powershell
         run: |
@@ -123,16 +132,14 @@ jobs:
           DEV_GATEWAY_USER:    ${{ secrets.DEV_GATEWAY_USER }}
 
   # ─────────────────────────────────────────────────────────
-  # STAGING — NEW job added
-  # Same approach as dev — uses bash.exe + deploy-project.sh
-  # Triggers: push to release/* OR manual staging/both
-  # Runner: self-hosted-staging on 172.16.3.120
+  # STAGING
   # ─────────────────────────────────────────────────────────
   deploy-staging:
     name: Deploy to Staging
     runs-on: self-hosted-staging
     needs: [build, test-pylib]
     if: |
+      (github.ref == 'refs/heads/develop' && github.event_name == 'push') ||
       (startsWith(github.ref, 'refs/heads/release/') && github.event_name == 'push') ||
       (github.event_name == 'workflow_dispatch' && (
         github.event.inputs.target_env == 'staging' ||
@@ -143,11 +150,27 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
         with:
           name: build-artifacts-${{ github.sha }}
           path: ./artifacts
+
+      - name: Fix Ignition Permissions on Staging
+        shell: powershell
+        run: |
+          $ip = "172.16.3.120"
+          $path1 = "\\$ip\C$\Program Files\Inductive Automation\Ignition\data"
+          $path2 = "\\$ip\C$\Program Files\Inductive Automation\Ignition\data\projects"
+          if (Test-Path $path1) {
+            icacls $path1 /grant "Everyone:(OI)(CI)F" /T 2>$null | Out-Null
+            icacls $path2 /grant "Everyone:(OI)(CI)F" /T 2>$null | Out-Null
+            Write-Host "Staging permissions fixed!"
+          } else {
+            Write-Host "Staging not reachable via network - deploying locally"
+          }
+
       - name: Deploy to Staging Gateway
         shell: powershell
         run: |
