@@ -173,13 +173,16 @@ jobs:
           $env:STAGING_GATEWAY_USER    = "${{ secrets.STAGGING_GATEWAY_USER }}"
           $env:STAGE_SSH_KEY           = "${{ secrets.STAGE_SSH_KEY }}"
 
-          # SSH key setup
+          # SSH key setup — Unix line endings ke saath save karo
           $sshDir = "$env:USERPROFILE\.ssh"
           New-Item -ItemType Directory -Force -Path $sshDir | Out-Null
-          $env:STAGE_SSH_KEY | Out-File -FilePath "$sshDir\staging_key" -Encoding ascii -NoNewline
+          [System.IO.File]::WriteAllText(
+            "$sshDir\staging_key",
+            $env:STAGE_SSH_KEY.Replace("`r`n", "`n").Replace("`r", "`n")
+          )
           icacls "$sshDir\staging_key" /inheritance:r /grant:r "${env:USERNAME}:F" | Out-Null
 
-          # SCP se files copy karo — usr\bin\scp.exe use karo
+          # SCP se files staging pe copy karo
           & "C:\Program Files\Git\usr\bin\scp.exe" -i "$sshDir\staging_key" `
             -o StrictHostKeyChecking=no `
             -r "projects/TestProject/." `
