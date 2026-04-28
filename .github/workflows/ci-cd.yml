@@ -93,6 +93,9 @@ jobs:
           chmod +x ./scripts/test-pylib.sh
           ./scripts/test-pylib.sh pylib/Mustry/Tests
 
+  # ─────────────────────────────────────────────────────────
+  # DEVELOPMENT
+  # ─────────────────────────────────────────────────────────
   deploy-dev:
     name: Deploy to Development
     runs-on: self-hosted
@@ -129,6 +132,9 @@ jobs:
           $env:DEV_GATEWAY_USER    = "${{ secrets.DEV_GATEWAY_USER }}"
           & "C:\Program Files\Git\bin\bash.exe" -c "DEV_GATEWAY_URL='$env:DEV_GATEWAY_URL' DEV_GATEWAY_API_KEY='$env:DEV_GATEWAY_API_KEY' DEV_GATEWAY_PASS='$env:DEV_GATEWAY_PASS' DEV_GATEWAY_USER='$env:DEV_GATEWAY_USER' ./scripts/deploy-project.sh dev projects/TestProject"
 
+  # ─────────────────────────────────────────────────────────
+  # STAGING
+  # ─────────────────────────────────────────────────────────
   deploy-staging:
     name: Deploy to Staging
     runs-on: Stagging
