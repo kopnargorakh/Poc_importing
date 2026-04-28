@@ -1,0 +1,1071 @@
+{
+  "custom": {},
+  "params": {},
+  "props": {
+    "defaultSize": {
+      "height": 801,
+      "width": 973
+    }
+  },
+  "root": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "meta": {
+                  "name": "MachineStatusTitleLabel"
+                },
+                "position": {
+                  "basis": "32px"
+                },
+                "props": {
+                  "style": {
+                    "color": "#F9FAFB",
+                    "font-size": "18px",
+                    "font-weight": "700",
+                    "letter-spacing": "0.01em"
+                  },
+                  "text": "Machine Status"
+                },
+                "type": "ia.display.label"
+              },
+              {
+                "meta": {
+                  "name": "MachineStatusTimelineChart"
+                },
+                "position": {
+                  "basis": "132px"
+                },
+                "props": {
+                  "data": {
+                    "datasets": [
+                      {
+                        "backgroundColor": "#795548",
+                        "begin": "2025-02-04T00:00:00",
+                        "data": [
+                          {
+                            "x": [
+                              "2025-02-04T00:00:00",
+                              "2025-02-04T06:00:00"
+                            ],
+                            "y": "line1"
+                          }
+                        ],
+                        "duration": 6,
+                        "end": "2025-02-04T06:00:00",
+                        "label": "Offline",
+                        "skipNull": true,
+                        "statusEventId": 120
+                      },
+                      {
+                        "backgroundColor": "#2E7D32",
+                        "begin": "2025-02-04T06:00:00",
+                        "data": [
+                          {
+                            "x": [
+                              "2025-02-04T06:00:00",
+                              "2025-02-04T07:35:00"
+                            ],
+                            "y": "line1"
+                          }
+                        ],
+                        "duration": 1.58,
+                        "end": "2025-02-04T07:35:00",
+                        "label": "In Cycle",
+                        "skipNull": true,
+                        "statusEventId": 121
+                      },
+                      {
+                        "backgroundColor": "#C62828",
+                        "begin": "2025-02-04T07:35:00",
+                        "data": [
+                          {
+                            "x": [
+                              "2025-02-04T07:35:00",
+                              "2025-02-04T08:00:00"
+                            ],
+                            "y": "line1"
+                          }
+                        ],
+                        "duration": 0.42,
+                        "end": "2025-02-04T08:00:00",
+                        "label": "Faulted",
+                        "skipNull": true,
+                        "statusEventId": 122
+                      },
+                      {
+                        "backgroundColor": "#EF6C00",
+                        "begin": "2025-02-04T08:00:00",
+                        "data": [
+                          {
+                            "x": [
+                              "2025-02-04T08:00:00",
+                              "2025-02-04T08:30:00"
+                            ],
+                            "y": "line1"
+                          }
+                        ],
+                        "duration": 0.5,
+                        "end": "2025-02-04T08:30:00",
+                        "label": "Idle",
+                        "skipNull": true,
+                        "statusEventId": 123
+                      },
+                      {
+                        "backgroundColor": "#2E7D32",
+                        "begin": "2025-02-04T08:30:00",
+                        "data": [
+                          {
+                            "x": [
+                              "2025-02-04T08:30:00",
+                              "2025-02-04T10:50:00"
+                            ],
+                            "y": "line1"
+                          }
+                        ],
+                        "duration": 2.33,
+                        "end": "2025-02-04T10:50:00",
+                        "label": "In Cycle",
+                        "skipNull": true,
+                        "statusEventId": 124
+                      },
+                      {
+                        "backgroundColor": "#795548",
+                        "begin": "2025-02-04T10:50:00",
+                        "data": [
+                          {
+                            "x": [
+                              "2025-02-04T10:50:00",
+                              "2025-02-04T11:20:00"
+                            ],
+                            "y": "line1"
+                          }
+                        ],
+                        "duration": 0.5,
+                        "end": "2025-02-04T11:20:00",
+                        "label": "Offline",
+                        "skipNull": true,
+                        "statusEventId": 125
+                      },
+                      {
+                        "backgroundColor": "#2E7D32",
+                        "begin": "2025-02-04T11:20:00",
+                        "data": [
+                          {
+                            "x": [
+                              "2025-02-04T11:20:00",
+                              "2025-02-04T12:10:00"
+                            ],
+                            "y": "line1"
+                          }
+                        ],
+                        "duration": 0.83,
+                        "end": "2025-02-04T12:10:00",
+                        "label": "In Cycle",
+                        "skipNull": true,
+                        "statusEventId": 126
+                      },
+                      {
+                        "backgroundColor": "#D84315",
+                        "begin": "2025-02-04T12:10:00",
+                        "data": [
+                          {
+                            "x": [
+                              "2025-02-04T12:10:00",
+                              "2025-02-04T12:50:00"
+                            ],
+                            "y": "line1"
+                          }
+                        ],
+                        "duration": 0.67,
+                        "end": "2025-02-04T12:50:00",
+                        "label": "Setup",
+                        "skipNull": true,
+                        "statusEventId": 127
+                      },
+                      {
+                        "backgroundColor": "#2E7D32",
+                        "begin": "2025-02-04T12:50:00",
+                        "data": [
+                          {
+                            "x": [
+                              "2025-02-04T12:50:00",
+                              "2025-02-04T14:40:00"
+                            ],
+                            "y": "line1"
+                          }
+                        ],
+                        "duration": 1.83,
+                        "end": "2025-02-04T14:40:00",
+                        "label": "In Cycle",
+                        "skipNull": true,
+                        "statusEventId": 128
+                      },
+                      {
+                        "backgroundColor": "#EF6C00",
+                        "begin": "2025-02-04T14:40:00",
+                        "data": [
+                          {
+                            "x": [
+                              "2025-02-04T14:40:00",
+                              "2025-02-04T15:05:00"
+                            ],
+                            "y": "line1"
+                          }
+                        ],
+                        "duration": 0.42,
+                        "end": "2025-02-04T15:05:00",
+                        "label": "Idle",
+                        "skipNull": true,
+                        "statusEventId": 129
+                      },
+                      {
+                        "backgroundColor": "#2E7D32",
+                        "begin": "2025-02-04T15:05:00",
+                        "data": [
+                          {
+                            "x": [
+                              "2025-02-04T15:05:00",
+                              "2025-02-04T18:00:00"
+                            ],
+                            "y": "line1"
+                          }
+                        ],
+                        "duration": 2.92,
+                        "end": "2025-02-04T18:00:00",
+                        "label": "In Cycle",
+                        "skipNull": true,
+                        "statusEventId": 130
+                      },
+                      {
+                        "backgroundColor": "#795548",
+                        "begin": "2025-02-04T18:00:00",
+                        "data": [
+                          {
+                            "x": [
+                              "2025-02-04T18:00:00",
+                              "2025-02-05T00:00:00"
+                            ],
+                            "y": "line1"
+                          }
+                        ],
+                        "duration": 6,
+                        "end": "2025-02-05T00:00:00",
+                        "label": "Offline",
+                        "skipNull": true,
+                        "statusEventId": 131
+                      }
+                    ]
+                  },
+                  "options": {
+                    "animation": {
+                      "duration": 0
+                    },
+                    "elements": {
+                      "bar": {
+                        "borderColor": "rgba(255,255,255,0.5)",
+                        "borderSkipped": false,
+                        "borderWidth": 1
+                      }
+                    },
+                    "indexAxis": "y",
+                    "layout": {
+                      "padding": {
+                        "bottom": 0,
+                        "left": 4,
+                        "right": 0,
+                        "top": 0
+                      }
+                    },
+                    "plugins": {
+                      "datalabels": {
+                        "align": "right",
+                        "anchor": "start",
+                        "clamp": true,
+                        "clip": true,
+                        "color": "#ffffff",
+                        "display": "(context) \u003d\u003e { var meta \u003d context.chart.getDatasetMeta(context.datasetIndex); var el \u003d meta.data[context.dataIndex]; if (!el || el.base \u003d\u003d\u003d undefined) return false; var barWidth \u003d Math.abs(el.x - el.base); var label \u003d context.dataset.label || \u0027\u0027; var charWidth \u003d 6.5; var textWidth \u003d label.length * charWidth + 12; return barWidth \u003e\u003d textWidth; }",
+                        "font": {
+                          "family": "inherit",
+                          "size": 11,
+                          "weight": "bold"
+                        },
+                        "formatter": "(value, context) \u003d\u003e { return context.dataset.label; }",
+                        "padding": {
+                          "left": 4,
+                          "right": 4
+                        }
+                      },
+                      "legend": {
+                        "display": false
+                      },
+                      "tooltip": {
+                        "backgroundColor": "#1a1a1acc",
+                        "callbacks": {
+                          "afterLabel": "(item) \u003d\u003e { var ds \u003d item.chart.data.datasets[item.datasetIndex]; var dur \u003d ds.duration || 0; var mins \u003d Math.round(dur * 60); return \u0027Duration: \u0027 + mins + \u0027 min\u0027; }",
+                          "footer": "(items) \u003d\u003e { var ds \u003d items[0].chart.data.datasets[items[0].datasetIndex]; return ds.subsystemName || \u0027\u0027; }",
+                          "label": "(item) \u003d\u003e { var ds \u003d item.chart.data.datasets[item.datasetIndex]; var begin \u003d ds.begin || \u0027\u0027; var end \u003d ds.end || \u0027\u0027; var b \u003d begin.substring(11, 16); var e \u003d end.substring(11, 16); return b + \u0027 → \u0027 + e; }",
+                          "title": "(items) \u003d\u003e { var ds \u003d items[0].chart.data.datasets[items[0].datasetIndex]; return ds.label +\" \" + ds.statusEventId || \u0027\u0027; }"
+                        },
+                        "padding": 10
+                      }
+                    },
+                    "scales": {
+                      "x": {
+                        "grid": {
+                          "color": "rgba(148,163,184,0.12)"
+                        },
+                        "max": "2025-02-04T18:00:00",
+                        "min": "2025-02-04T06:00:00",
+                        "ticks": {
+                          "color": "#8A96A8",
+                          "maxTicksLimit": 13
+                        },
+                        "time": {
+                          "displayFormats": {
+                            "hour": "HH:mm"
+                          },
+                          "unit": "hour"
+                        },
+                        "type": "time"
+                      },
+                      "y": {
+                        "display": false,
+                        "stacked": true,
+                        "type": "category"
+                      }
+                    }
+                  },
+                  "type": "bar"
+                },
+                "type": "embr.chart.chart-js"
+              }
+            ],
+            "meta": {
+              "name": "MachineStatusSection"
+            },
+            "position": {
+              "basis": "200px"
+            },
+            "props": {
+              "direction": "column",
+              "style": {
+                "background-color": "#1C1F26",
+                "border": "1px solid #2B2F3B",
+                "border-radius": "12px",
+                "box-shadow": "0 8px 24px rgba(0,0,0,0.32)",
+                "margin-bottom": "16px",
+                "padding": "16px"
+              }
+            },
+            "type": "ia.container.flex"
+          },
+          {
+            "children": [
+              {
+                "meta": {
+                  "name": "OEETrendTitleLabel"
+                },
+                "position": {
+                  "basis": "32px"
+                },
+                "props": {
+                  "style": {
+                    "color": "#F9FAFB",
+                    "font-size": "16px",
+                    "font-weight": "700"
+                  },
+                  "text": "OEE Trend"
+                },
+                "type": "ia.display.label"
+              },
+              {
+                "meta": {
+                  "name": "OEETrendChart"
+                },
+                "position": {
+                  "basis": "400px"
+                },
+                "props": {
+                  "data": {
+                    "datasets": [
+                      {
+                        "borderColor": "#EA7D62",
+                        "borderDash": [
+                          4,
+                          4
+                        ],
+                        "borderWidth": 1,
+                        "data": [
+                          65,
+                          65,
+                          65,
+                          65,
+                          65,
+                          65,
+                          65,
+                          65,
+                          65,
+                          65,
+                          65,
+                          65,
+                          65
+                        ],
+                        "label": "Minimum",
+                        "pointHoverRadius": 0,
+                        "pointRadius": 0,
+                        "tension": 0
+                      },
+                      {
+                        "backgroundColor": "rgba(54, 201, 184, 0.16)",
+                        "borderColor": "#2E7D32",
+                        "borderDash": [
+                          4,
+                          4
+                        ],
+                        "borderWidth": 1,
+                        "data": [
+                          85,
+                          85,
+                          85,
+                          85,
+                          85,
+                          85,
+                          85,
+                          85,
+                          85,
+                          85,
+                          85,
+                          85,
+                          85
+                        ],
+                        "fill": "-1",
+                        "label": "Target",
+                        "pointHoverRadius": 0,
+                        "pointRadius": 0,
+                        "tension": 0
+                      },
+                      {
+                        "backgroundColor": "#5385F9",
+                        "borderColor": "#5385F9",
+                        "borderWidth": 3,
+                        "data": [
+                          63,
+                          65,
+                          61,
+                          68,
+                          72,
+                          70,
+                          69,
+                          73,
+                          77,
+                          74,
+                          76,
+                          79,
+                          78
+                        ],
+                        "label": "OEE",
+                        "pointBackgroundColor": "#FFFFFF",
+                        "pointBorderColor": "#5385F9",
+                        "pointBorderWidth": 2,
+                        "pointHoverRadius": 6,
+                        "pointRadius": 4,
+                        "tension": 0.32
+                      }
+                    ],
+                    "labels": [
+                      "06:00",
+                      "07:00",
+                      "08:00",
+                      "09:00",
+                      "10:00",
+                      "11:00",
+                      "12:00",
+                      "13:00",
+                      "14:00",
+                      "15:00",
+                      "16:00",
+                      "17:00",
+                      "18:00"
+                    ]
+                  },
+                  "options": {
+                    "interaction": {
+                      "intersect": false,
+                      "mode": "index"
+                    },
+                    "plugins": {
+                      "legend": {
+                        "labels": {
+                          "boxHeight": 10,
+                          "boxWidth": 10,
+                          "color": "#C6D4FD",
+                          "usePointStyle": true
+                        }
+                      },
+                      "tooltip": {
+                        "backgroundColor": "rgba(16, 23, 30, 0.92)",
+                        "callbacks": {
+                          "label": "(item) \u003d\u003e { return item.dataset.label + \u0027: \u0027 + item.formattedValue + \u0027%\u0027; }"
+                        },
+                        "cornerRadius": 8,
+                        "padding": 10
+                      }
+                    },
+                    "scales": {
+                      "x": {
+                        "grid": {
+                          "color": "rgba(148, 163, 184, 0.16)",
+                          "drawBorder": false,
+                          "drawOnChartArea": false
+                        },
+                        "ticks": {
+                          "color": "#8A96A8",
+                          "maxRotation": 0
+                        },
+                        "type": "category"
+                      },
+                      "y": {
+                        "grid": {
+                          "color": "rgba(148, 163, 184, 0.20)",
+                          "drawBorder": false
+                        },
+                        "max": 100,
+                        "min": 0,
+                        "ticks": {
+                          "callback": "(value) \u003d\u003e { return value + \u0027%\u0027; }",
+                          "color": "#8A96A8",
+                          "stepSize": 10
+                        },
+                        "type": "linear"
+                      }
+                    }
+                  }
+                },
+                "type": "embr.chart.chart-js"
+              }
+            ],
+            "meta": {
+              "name": "OEETrendSection"
+            },
+            "position": {
+              "basis": "460px"
+            },
+            "props": {
+              "direction": "column",
+              "style": {
+                "background-color": "#1C1F26",
+                "border": "1px solid #2B2F3B",
+                "border-radius": "12px",
+                "box-shadow": "0 8px 24px rgba(0,0,0,0.32)",
+                "margin-bottom": "16px",
+                "padding": "16px"
+              }
+            },
+            "type": "ia.container.flex"
+          },
+          {
+            "children": [
+              {
+                "meta": {
+                  "name": "ProductionTrendTitleLabel"
+                },
+                "position": {
+                  "basis": "32px"
+                },
+                "props": {
+                  "style": {
+                    "color": "#F9FAFB",
+                    "font-size": "16px",
+                    "font-weight": "700"
+                  },
+                  "text": "Productie Trend"
+                },
+                "type": "ia.display.label"
+              },
+              {
+                "meta": {
+                  "name": "ProductionTrendChart"
+                },
+                "position": {
+                  "basis": "400px"
+                },
+                "props": {
+                  "data": {
+                    "datasets": [
+                      {
+                        "borderColor": "#EA7D62",
+                        "borderDash": [
+                          4,
+                          4
+                        ],
+                        "borderWidth": 1,
+                        "data": [
+                          0,
+                          27,
+                          53,
+                          80,
+                          107,
+                          133,
+                          160,
+                          187,
+                          213,
+                          240,
+                          267,
+                          293,
+                          320
+                        ],
+                        "label": "Minimum",
+                        "pointHoverRadius": 0,
+                        "pointRadius": 0,
+                        "tension": 0
+                      },
+                      {
+                        "borderColor": "#2E7D32",
+                        "borderDash": [
+                          4,
+                          4
+                        ],
+                        "borderWidth": 1,
+                        "data": [
+                          0,
+                          67,
+                          133,
+                          200,
+                          267,
+                          333,
+                          400,
+                          467,
+                          533,
+                          600,
+                          667,
+                          733,
+                          800
+                        ],
+                        "label": "Target",
+                        "pointHoverRadius": 0,
+                        "pointRadius": 0,
+                        "tension": 0
+                      },
+                      {
+                        "borderColor": "#5385F9",
+                        "borderWidth": 3,
+                        "data": [
+                          0,
+                          48,
+                          78,
+                          145,
+                          205,
+                          250,
+                          300,
+                          355,
+                          430,
+                          470,
+                          545,
+                          620,
+                          700
+                        ],
+                        "label": "Actual",
+                        "pointBackgroundColor": "#FFFFFF",
+                        "pointBorderColor": "#5385F9",
+                        "pointBorderWidth": 2,
+                        "pointHoverRadius": 6,
+                        "pointRadius": 4,
+                        "tension": 0.3
+                      }
+                    ],
+                    "labels": [
+                      "06:00",
+                      "07:00",
+                      "08:00",
+                      "09:00",
+                      "10:00",
+                      "11:00",
+                      "12:00",
+                      "13:00",
+                      "14:00",
+                      "15:00",
+                      "16:00",
+                      "17:00",
+                      "18:00"
+                    ]
+                  },
+                  "options": {
+                    "interaction": {
+                      "intersect": false,
+                      "mode": "index"
+                    },
+                    "plugins": {
+                      "legend": {
+                        "labels": {
+                          "boxHeight": 10,
+                          "boxWidth": 10,
+                          "color": "#C6D4FD",
+                          "usePointStyle": true
+                        }
+                      },
+                      "tooltip": {
+                        "backgroundColor": "rgba(16, 23, 30, 0.92)",
+                        "callbacks": {
+                          "label": "(item) \u003d\u003e { return item.dataset.label + \u0027: \u0027 + item.formattedValue; }"
+                        },
+                        "cornerRadius": 8,
+                        "padding": 10
+                      }
+                    },
+                    "scales": {
+                      "x": {
+                        "grid": {
+                          "color": "rgba(148, 163, 184, 0.16)",
+                          "drawBorder": false,
+                          "drawOnChartArea": false
+                        },
+                        "ticks": {
+                          "color": "#8A96A8",
+                          "maxRotation": 0
+                        },
+                        "type": "category"
+                      },
+                      "y": {
+                        "grid": {
+                          "color": "rgba(148, 163, 184, 0.20)",
+                          "drawBorder": false
+                        },
+                        "max": 800,
+                        "min": 0,
+                        "ticks": {
+                          "color": "#8A96A8",
+                          "stepSize": 100
+                        },
+                        "type": "linear"
+                      }
+                    }
+                  }
+                },
+                "type": "embr.chart.chart-js"
+              }
+            ],
+            "meta": {
+              "name": "ProductionTrendSection"
+            },
+            "position": {
+              "basis": "460px"
+            },
+            "props": {
+              "direction": "column",
+              "style": {
+                "background-color": "#1C1F26",
+                "border": "1px solid #2B2F3B",
+                "border-radius": "12px",
+                "box-shadow": "0 8px 24px rgba(0,0,0,0.32)",
+                "margin-bottom": "16px",
+                "padding": "16px"
+              }
+            },
+            "type": "ia.container.flex"
+          }
+        ],
+        "meta": {
+          "name": "MainChartsColumn"
+        },
+        "position": {
+          "grow": 1
+        },
+        "props": {
+          "direction": "column"
+        },
+        "type": "ia.container.flex"
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "meta": {
+                      "name": "AvailabilityLabel"
+                    },
+                    "props": {
+                      "style": {
+                        "color": "#8A96A8",
+                        "font-size": "11px",
+                        "font-weight": "600",
+                        "letter-spacing": "0.03em",
+                        "white-space": "nowrap"
+                      },
+                      "text": "Availability"
+                    },
+                    "type": "ia.display.label"
+                  },
+                  {
+                    "meta": {
+                      "name": "AvailabilityValue"
+                    },
+                    "props": {
+                      "style": {
+                        "color": "#F9FAFB",
+                        "font-size": "32px",
+                        "font-weight": "800",
+                        "line-height": "1.05",
+                        "white-space": "nowrap"
+                      },
+                      "text": "90%"
+                    },
+                    "type": "ia.display.label"
+                  }
+                ],
+                "meta": {
+                  "name": "AvailabilityCard"
+                },
+                "position": {
+                  "basis": "104px",
+                  "shrink": 0
+                },
+                "props": {
+                  "direction": "column",
+                  "style": {
+                    "background-color": "#1C1F26",
+                    "border": "1px solid #2B2F3B",
+                    "border-left": "3px solid #7799F9",
+                    "border-radius": "12px",
+                    "box-shadow": "0 6px 20px rgba(0,0,0,0.32)",
+                    "gap": "6px",
+                    "justify-content": "center",
+                    "margin-bottom": "16px",
+                    "min-height": "96px",
+                    "padding": "16px"
+                  }
+                },
+                "type": "ia.container.flex"
+              },
+              {
+                "children": [
+                  {
+                    "meta": {
+                      "name": "PerformanceLabel"
+                    },
+                    "props": {
+                      "style": {
+                        "color": "#8A96A8",
+                        "font-size": "11px",
+                        "font-weight": "600",
+                        "letter-spacing": "0.03em",
+                        "white-space": "nowrap"
+                      },
+                      "text": "Performance"
+                    },
+                    "type": "ia.display.label"
+                  },
+                  {
+                    "meta": {
+                      "name": "PerformanceValue"
+                    },
+                    "props": {
+                      "style": {
+                        "color": "#F9FAFB",
+                        "font-size": "32px",
+                        "font-weight": "800",
+                        "line-height": "1.05",
+                        "white-space": "nowrap"
+                      },
+                      "text": "88%"
+                    },
+                    "type": "ia.display.label"
+                  }
+                ],
+                "meta": {
+                  "name": "PerformanceCard"
+                },
+                "position": {
+                  "basis": "104px",
+                  "shrink": 0
+                },
+                "props": {
+                  "direction": "column",
+                  "style": {
+                    "background-color": "#1C1F26",
+                    "border": "1px solid #2B2F3B",
+                    "border-left": "3px solid #36C9B8",
+                    "border-radius": "12px",
+                    "box-shadow": "0 6px 20px rgba(0,0,0,0.32)",
+                    "gap": "6px",
+                    "justify-content": "center",
+                    "margin-bottom": "16px",
+                    "min-height": "96px",
+                    "padding": "16px"
+                  }
+                },
+                "type": "ia.container.flex"
+              },
+              {
+                "children": [
+                  {
+                    "meta": {
+                      "name": "QualityLabel"
+                    },
+                    "props": {
+                      "style": {
+                        "color": "#8A96A8",
+                        "font-size": "11px",
+                        "font-weight": "600",
+                        "letter-spacing": "0.03em",
+                        "white-space": "nowrap"
+                      },
+                      "text": "Quality"
+                    },
+                    "type": "ia.display.label"
+                  },
+                  {
+                    "meta": {
+                      "name": "QualityValue"
+                    },
+                    "props": {
+                      "style": {
+                        "color": "#F9FAFB",
+                        "font-size": "32px",
+                        "font-weight": "800",
+                        "line-height": "1.05",
+                        "white-space": "nowrap"
+                      },
+                      "text": "98%"
+                    },
+                    "type": "ia.display.label"
+                  }
+                ],
+                "meta": {
+                  "name": "QualityCard"
+                },
+                "position": {
+                  "basis": "104px",
+                  "shrink": 0
+                },
+                "props": {
+                  "direction": "column",
+                  "style": {
+                    "background-color": "#1C1F26",
+                    "border": "1px solid #2B2F3B",
+                    "border-left": "3px solid #EA7D62",
+                    "border-radius": "12px",
+                    "box-shadow": "0 6px 20px rgba(0,0,0,0.32)",
+                    "gap": "6px",
+                    "justify-content": "center",
+                    "margin-bottom": "16px",
+                    "min-height": "96px",
+                    "padding": "16px"
+                  }
+                },
+                "type": "ia.container.flex"
+              },
+              {
+                "children": [
+                  {
+                    "meta": {
+                      "name": "OEEKpiLabel"
+                    },
+                    "props": {
+                      "style": {
+                        "color": "#8A96A8",
+                        "font-size": "11px",
+                        "font-weight": "600",
+                        "letter-spacing": "0.03em",
+                        "white-space": "nowrap"
+                      },
+                      "text": "OEE"
+                    },
+                    "type": "ia.display.label"
+                  },
+                  {
+                    "meta": {
+                      "name": "OEEKpiValue"
+                    },
+                    "props": {
+                      "style": {
+                        "color": "#F9FAFB",
+                        "font-size": "32px",
+                        "font-weight": "800",
+                        "line-height": "1.05",
+                        "white-space": "nowrap"
+                      },
+                      "text": "78%"
+                    },
+                    "type": "ia.display.label"
+                  }
+                ],
+                "meta": {
+                  "name": "OEEKpiCard"
+                },
+                "position": {
+                  "basis": "104px",
+                  "shrink": 0
+                },
+                "props": {
+                  "direction": "column",
+                  "style": {
+                    "background-color": "#1C1F26",
+                    "border": "1px solid #2B2F3B",
+                    "border-left": "3px solid #507BF8",
+                    "border-radius": "12px",
+                    "box-shadow": "0 6px 20px rgba(0,0,0,0.32)",
+                    "gap": "6px",
+                    "justify-content": "center",
+                    "margin-bottom": "16px",
+                    "min-height": "96px",
+                    "padding": "16px"
+                  }
+                },
+                "type": "ia.container.flex"
+              }
+            ],
+            "meta": {
+              "name": "KPIColumn"
+            },
+            "position": {
+              "basis": "300px",
+              "grow": 1,
+              "shrink": 0
+            },
+            "props": {
+              "direction": "column",
+              "style": {
+                "gap": "12px",
+                "margin-top": "0px"
+              }
+            },
+            "type": "ia.container.flex"
+          }
+        ],
+        "meta": {
+          "name": "RightSidebarPanel"
+        },
+        "position": {
+          "basis": "300px",
+          "shrink": 0
+        },
+        "props": {
+          "direction": "column",
+          "style": {
+            "background-color": "#16181D",
+            "border": "1px solid #2B2F3B",
+            "border-radius": "12px",
+            "padding": "12px"
+          }
+        },
+        "type": "ia.container.flex"
+      }
+    ],
+    "meta": {
+      "name": "RootContainer"
+    },
+    "props": {
+      "style": {
+        "background": "linear-gradient(180deg, #16181D 0%, #1C1F26 100%)",
+        "gap": "16px",
+        "padding": "24px"
+      }
+    },
+    "type": "ia.container.flex"
+  }
+}
