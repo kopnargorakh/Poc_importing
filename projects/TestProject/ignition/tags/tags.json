@@ -5,7 +5,7 @@
     {
       "valueSource": "memory",
       "name": "Cognizant",
-      "defaultValue": 90000.0,
+      "defaultValue": 200.0,
       "tagType": "AtomicTag",
       "dataType": "Float4"
     },
