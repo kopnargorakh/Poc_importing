@@ -109,9 +109,19 @@ echo "Deploying to: $DEPLOY_DIR"
 
 mkdir -p "$DEPLOY_DIR"
 
+# ─── FIX: Sync files — add/delete/update sab reflect hoga ────────────────────
 echo "Copying project files..."
+# Pehle extra files delete karo jo repo mein nahi hain
+find "$DEPLOY_DIR" -type f | while read file; do
+  rel="${file#$DEPLOY_DIR/}"
+  if [ ! -f "$SOURCE_DIR/$rel" ]; then
+    rm -f "$file"
+  fi
+done
+# Phir nayi/updated files copy karo
 cp -rf "$SOURCE_DIR/." "$DEPLOY_DIR/"
 echo "  ✓ Project files updated"
+# ─────────────────────────────────────────────────────────────────────────────
 
 if [ "$IS_ZIP" = true ]; then rm -rf "$TEMP_DIR"; fi
 
