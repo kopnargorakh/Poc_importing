@@ -93,9 +93,6 @@ jobs:
           chmod +x ./scripts/test-pylib.sh
           ./scripts/test-pylib.sh pylib/Mustry/Tests
 
-  # ─────────────────────────────────────────────────────────
-  # DEVELOPMENT
-  # ─────────────────────────────────────────────────────────
   deploy-dev:
     name: Deploy to Development
     runs-on: self-hosted
@@ -132,12 +129,9 @@ jobs:
           $env:DEV_GATEWAY_USER    = "${{ secrets.DEV_GATEWAY_USER }}"
           & "C:\Program Files\Git\bin\bash.exe" -c "DEV_GATEWAY_URL='$env:DEV_GATEWAY_URL' DEV_GATEWAY_API_KEY='$env:DEV_GATEWAY_API_KEY' DEV_GATEWAY_PASS='$env:DEV_GATEWAY_PASS' DEV_GATEWAY_USER='$env:DEV_GATEWAY_USER' ./scripts/deploy-project.sh dev projects/TestProject"
 
-  # ─────────────────────────────────────────────────────────
-  # STAGING
-  # ─────────────────────────────────────────────────────────
   deploy-staging:
     name: Deploy to Staging
-    runs-on: self-hosted
+    runs-on: Stagging
     needs: [build, test-pylib]
     if: |
       (github.ref == 'refs/heads/develop' && github.event_name == 'push') ||
@@ -170,15 +164,4 @@ jobs:
           $env:STAGING_GATEWAY_API_KEY = "${{ secrets.STAGE_GATEWAY_API_KEY }}"
           $env:STAGING_GATEWAY_PASS    = "${{ secrets.STAGE_GATEWAY_PASS }}"
           $env:STAGING_GATEWAY_USER    = "${{ secrets.STAGGING_GATEWAY_USER }}"
-
-          # SSH key — pehle se dev machine pe maujood file use karo
-          $sshKeyPath = "C:\Users\gorakh\.ssh\staging_key"
-
-          # SCP se files staging pe copy karo
-          & "C:\Program Files\Git\usr\bin\scp.exe" -i $sshKeyPath `
-            -o StrictHostKeyChecking=no `
-            -r "C:/Users/Administrator/Poc_importing/projects/TestProject" `
-            "Administrator@172.16.3.120:/C:/Program Files/Inductive Automation/Ignition/data/projects/"
-
-          # API scan karo
           & "C:\Program Files\Git\bin\bash.exe" -c "STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' STAGING_GATEWAY_USER='$env:STAGING_GATEWAY_USER' ./scripts/deploy-project.sh staging projects/TestProject"
