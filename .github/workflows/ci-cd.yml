@@ -130,18 +130,18 @@ jobs:
           $env:DEV_GATEWAY_PASS    = "${{ secrets.DEV_GATEWAY_PASS }}"
           $env:DEV_GATEWAY_USER    = "${{ secrets.DEV_GATEWAY_USER }}"
 
-          # Changed projects nikalo
           $changedFiles = & "C:\Program Files\Git\bin\git.exe" diff --name-only HEAD~1 HEAD
           $changedProjects = $changedFiles | Where-Object { $_ -match "^projects/([^/]+)/" } | ForEach-Object {
               ($_ -split "/")[1]
           } | Select-Object -Unique
 
-          if ($changedProjects.Count -eq 0) {
+          if (-not $changedProjects -or $changedProjects.Count -eq 0) {
               Write-Host "No project changes detected — skipping deploy"
           } else {
               foreach ($project in $changedProjects) {
                   Write-Host "Deploying $project..."
-                  & "C:\Program Files\Git\bin\bash.exe" -c "DEV_GATEWAY_URL='$env:DEV_GATEWAY_URL' DEV_GATEWAY_API_KEY='$env:DEV_GATEWAY_API_KEY' DEV_GATEWAY_PASS='$env:DEV_GATEWAY_PASS' DEV_GATEWAY_USER='$env:DEV_GATEWAY_USER' ./scripts/deploy-project.sh dev projects/$project"
+                  $bashCmd = "DEV_GATEWAY_URL='$env:DEV_GATEWAY_URL' DEV_GATEWAY_API_KEY='$env:DEV_GATEWAY_API_KEY' DEV_GATEWAY_PASS='$env:DEV_GATEWAY_PASS' DEV_GATEWAY_USER='$env:DEV_GATEWAY_USER' ./scripts/deploy-project.sh dev projects/$project"
+                  & "C:\Program Files\Git\bin\bash.exe" -c $bashCmd
               }
           }
 
@@ -183,17 +183,17 @@ jobs:
           $env:STAGING_GATEWAY_PASS    = "${{ secrets.STAGE_GATEWAY_PASS }}"
           $env:STAGING_GATEWAY_USER    = "${{ secrets.STAGGING_GATEWAY_USER }}"
 
-          # Changed projects nikalo
           $changedFiles = & "C:\Program Files\Git\bin\git.exe" diff --name-only HEAD~1 HEAD
           $changedProjects = $changedFiles | Where-Object { $_ -match "^projects/([^/]+)/" } | ForEach-Object {
               ($_ -split "/")[1]
           } | Select-Object -Unique
 
-          if ($changedProjects.Count -eq 0) {
+          if (-not $changedProjects -or $changedProjects.Count -eq 0) {
               Write-Host "No project changes detected — skipping deploy"
           } else {
               foreach ($project in $changedProjects) {
                   Write-Host "Deploying $project..."
-                  & "C:\Program Files\Git\bin\bash.exe" -c "STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' STAGING_GATEWAY_USER='$env:STAGING_GATEWAY_USER' ./scripts/deploy-project.sh staging projects/$project"
+                  $bashCmd = "STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' STAGING_GATEWAY_USER='$env:STAGING_GATEWAY_USER' ./scripts/deploy-project.sh staging projects/$project"
+                  & "C:\Program Files\Git\bin\bash.exe" -c $bashCmd
               }
           }
