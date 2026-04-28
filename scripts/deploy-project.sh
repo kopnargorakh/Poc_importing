@@ -42,10 +42,34 @@ TAGS_ROOT=$(grep "^tags_root:"    "$CONFIG_FILE" | sed 's/^tags_root:[[:space:]]
 GATEWAY_URL_FROM_CONFIG=$(grep "url:" "$CONFIG_FILE" | head -1 | awk '{print $2}')
 API_KEY_FROM_CONFIG=$(grep "api_key:" "$CONFIG_FILE" | head -1 | awk '{print $2}')
 
-GATEWAY_URL="$(eval echo \$${ENV_VAR_PREFIX}_GATEWAY_URL)"
-API_KEY="$(eval    echo \$${ENV_VAR_PREFIX}_GATEWAY_API_KEY)"
-GATEWAY_PASS="$(eval echo \$${ENV_VAR_PREFIX}_GATEWAY_PASS)"
-GATEWAY_USER="$(eval echo \$${ENV_VAR_PREFIX}_GATEWAY_USER)"
+# ─── FIX: eval ki jagah case use karo ────────────────────────────────────────
+case "$ENVIRONMENT" in
+  dev)
+    GATEWAY_URL="$DEV_GATEWAY_URL"
+    API_KEY="$DEV_GATEWAY_API_KEY"
+    GATEWAY_PASS="$DEV_GATEWAY_PASS"
+    GATEWAY_USER="$DEV_GATEWAY_USER"
+    ;;
+  staging)
+    GATEWAY_URL="$STAGING_GATEWAY_URL"
+    API_KEY="$STAGING_GATEWAY_API_KEY"
+    GATEWAY_PASS="$STAGING_GATEWAY_PASS"
+    GATEWAY_USER="$STAGING_GATEWAY_USER"
+    ;;
+  local)
+    GATEWAY_URL="$LOCAL_GATEWAY_URL"
+    API_KEY="$LOCAL_GATEWAY_API_KEY"
+    GATEWAY_PASS="$LOCAL_GATEWAY_PASS"
+    GATEWAY_USER="$LOCAL_GATEWAY_USER"
+    ;;
+  prod)
+    GATEWAY_URL="$PROD_GATEWAY_URL"
+    API_KEY="$PROD_GATEWAY_API_KEY"
+    GATEWAY_PASS="$PROD_GATEWAY_PASS"
+    GATEWAY_USER="$PROD_GATEWAY_USER"
+    ;;
+esac
+# ─────────────────────────────────────────────────────────────────────────────
 
 if [ -z "$GATEWAY_URL" ];  then GATEWAY_URL="$GATEWAY_URL_FROM_CONFIG"; fi
 if [ -z "$API_KEY" ];      then API_KEY="$API_KEY_FROM_CONFIG";         fi
@@ -119,7 +143,6 @@ EOF
     echo "  ✓ unary-resource.json created (default)"
   fi
 
-  # ─── Tags reload: pehle scan API, phir WebDev fallback ───────────────────
   echo ""
   echo "Reloading tags..."
   TAGS_RELOAD_SUCCESS=false
@@ -160,7 +183,6 @@ EOF
       fi
     fi
   fi
-  # ─────────────────────────────────────────────────────────────────────────
 
 else
   echo "  ℹ No tags file or tags_root not configured — skipping tags"
