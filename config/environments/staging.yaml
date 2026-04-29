@@ -2,13 +2,13 @@
 # Staging Environment Configuration
 environment: staging
 
-# ✅ Updated: Your actual staging server paths
+
 deploy_root: "C:/Program Files/Inductive Automation/Ignition/data/projects"
-tags_root: "C:/Program Files/Inductive Automation/Ignition/data/config/core/ignition/tag-definition/default"
+tags_root: "C:/Program Files/Inductive Automation/Ignition/data/config/resources/core/ignition/tag-definition/default"
 gateway_config_root: "C:/Program Files/Inductive Automation/Ignition/data/config"
 
 gateway:
-  url: http://172.16.3.120:8088      # ✅ Your actual staging gateway IP
+  url: http://172.16.3.120:8088     
   username: admin
   container_name: ignition-staging
   backup_path: ./backups/staging
