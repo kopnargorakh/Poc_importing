@@ -4,8 +4,8 @@
   "tags": [
     {
       "valueSource": "memory",
-      "name": "Temperature",
-      "defaultValue": 100.0,
+      "name": "Cognizant",
+      "defaultValue": 200.0,
       "tagType": "AtomicTag",
       "dataType": "Float4"
     },
