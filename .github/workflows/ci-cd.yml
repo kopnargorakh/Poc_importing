@@ -1,4 +1,4 @@
-# GitHub Actions CI/CD Pipeline for Ignition 8.3
+## GitHub Actions CI/CD Pipeline for Ignition 8.3
 # Staging Pipeline — triggers on Stagging branch
 name: Staging Pipeline
 
