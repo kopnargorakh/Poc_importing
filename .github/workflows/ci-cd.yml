@@ -110,14 +110,10 @@ jobs:
           $env:STAGING_GATEWAY_API_KEY = "${{ secrets.STAGE_GATEWAY_API_KEY }}"
           $env:STAGING_GATEWAY_PASS    = "${{ secrets.STAGE_GATEWAY_PASS }}"
           $env:STAGING_GATEWAY_USER    = "${{ secrets.STAGGING_GATEWAY_USER }}"
-          & "C:\Program Files\Git\bin\bash.exe" -c "
-            for dir in ./artifacts/projects/*/; do
-              PROJECT=\$(basename \$dir)
-              echo '--- Deploying '\$PROJECT' to Staging ---'
-              STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' \
-              STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' \
-              STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' \
-              STAGING_GATEWAY_USER='$env:STAGING_GATEWAY_USER' \
-              ./scripts/deploy-project.sh staging artifacts/projects/\$PROJECT
-            done
-          "
+
+          $projects = Get-ChildItem -Path ".\artifacts\projects" -Directory
+          foreach ($project in $projects) {
+            Write-Host "--- Deploying $($project.Name) to Staging ---"
+            $bashCmd = "STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' STAGING_GATEWAY_USER='$env:STAGING_GATEWAY_USER' ./scripts/deploy-project.sh staging artifacts/projects/$($project.Name)"
+            & "C:\Program Files\Git\bin\bash.exe" -c $bashCmd
+          }
