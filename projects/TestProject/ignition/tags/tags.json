@@ -5,7 +5,7 @@
     {
       "valueSource": "memory",
       "name": "hello world",
-      "defaultValue": 29092000.0,
+      "defaultValue": 455.0,
       "tagType": "AtomicTag",
       "dataType": "Float4"
     },
