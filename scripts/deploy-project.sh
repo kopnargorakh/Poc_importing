@@ -37,15 +37,28 @@ if [ ! -f "$CONFIG_FILE" ]; then
   exit 1
 fi
 
+# ─── Read config values ───────────────────────────────────────────────────────
 DEPLOY_ROOT=$(grep "^deploy_root:" "$CONFIG_FILE" | sed 's/^deploy_root:[[:space:]]*//' | tr -d '"')
 TAGS_ROOT=$(grep "^tags_root:"    "$CONFIG_FILE" | sed 's/^tags_root:[[:space:]]*//'    | tr -d '"')
 GATEWAY_URL_FROM_CONFIG=$(grep "url:" "$CONFIG_FILE" | head -1 | awk '{print $2}')
 API_KEY_FROM_CONFIG=$(grep "api_key:" "$CONFIG_FILE" | head -1 | awk '{print $2}')
 
-# ─── DEBUG — print config values ─────────────────────────────────────────────
-echo "DEBUG deploy_root: '$DEPLOY_ROOT'"
-echo "DEBUG tags_root:   '$TAGS_ROOT'"
+# ─── Convert Windows paths to Git Bash compatible paths ──────────────────────
+# Converts: C:/Program Files/... → /c/Program Files/...
+convert_path() {
+  local p="$1"
+  # Handle C:/ or C:\ style
+  echo "$p" | sed 's|^\([A-Za-z]\):[/\\]|/\L\1/|' | sed 's|\\|/|g'
+}
 
+DEPLOY_ROOT=$(convert_path "$DEPLOY_ROOT")
+TAGS_ROOT=$(convert_path "$TAGS_ROOT")
+
+# ─── DEBUG — print config values ─────────────────────────────────────────────
+echo "DEBUG deploy_root (converted): '$DEPLOY_ROOT'"
+echo "DEBUG tags_root   (converted): '$TAGS_ROOT'"
+
+# ─── Resolve credentials ──────────────────────────────────────────────────────
 GATEWAY_URL="$(eval echo \$${ENV_VAR_PREFIX}_GATEWAY_URL)"
 API_KEY="$(eval    echo \$${ENV_VAR_PREFIX}_GATEWAY_API_KEY)"
 GATEWAY_PASS="$(eval echo \$${ENV_VAR_PREFIX}_GATEWAY_PASS)"
@@ -57,12 +70,14 @@ if [ -z "$API_KEY" ] && [ -f "$PROJECT_ROOT/secrets/gateway_api_key" ]; then
   API_KEY=$(tr -d '\r\n' < "$PROJECT_ROOT/secrets/gateway_api_key")
 fi
 
+# ─── Deploy root ──────────────────────────────────────────────────────────────
 if [ -n "$DEPLOY_ROOT" ]; then
   DEPLOY_TARGET="$DEPLOY_ROOT"
 else
   DEPLOY_TARGET="$PROJECT_ROOT"
 fi
 
+# ─── Unzip if needed ──────────────────────────────────────────────────────────
 if [ "$IS_ZIP" = true ]; then
   TEMP_DIR=$(mktemp -d)
   unzip -q "$PROJECT_SOURCE" -d "$TEMP_DIR"
@@ -103,7 +118,7 @@ echo ""
 echo "DEBUG tags_source: '$TAGS_SOURCE'"
 echo "DEBUG tags_source exists: $([ -f "$TAGS_SOURCE" ] && echo YES || echo NO)"
 
-# ✅ If tags_root empty — auto build from deploy_root + project_name
+# If tags_root empty — auto build from deploy_root + project_name
 if [ -z "$TAGS_ROOT" ]; then
   TAGS_ROOT="$DEPLOY_ROOT/$PROJECT_NAME/ignition/tags"
   echo "  ℹ tags_root was empty — auto-built: $TAGS_ROOT"
@@ -113,12 +128,11 @@ echo "DEBUG tags_root final: '$TAGS_ROOT'"
 
 if [ -f "$TAGS_SOURCE" ]; then
   echo ""
-  echo "Deploying tags to file system..."
+  echo "Deploying tags to: $TAGS_ROOT"
   mkdir -p "$TAGS_ROOT"
 
-  # ✅ Copy 1: to tags_root (from config or auto-built)
   cp "$TAGS_SOURCE" "$TAGS_ROOT/tags.json"
-  echo "  ✓ tags.json copied to tags_root: $TAGS_ROOT"
+  echo "  ✓ tags.json copied to: $TAGS_ROOT"
 
   if [ -f "$RESOURCE_SOURCE" ]; then
     cp "$RESOURCE_SOURCE" "$TAGS_ROOT/unary-resource.json"
@@ -178,7 +192,6 @@ EOF
       fi
     fi
   fi
-  # ─────────────────────────────────────────────────────────────────────────
 
 else
   echo "  ℹ No tags.json found at: $TAGS_SOURCE — skipping tags deploy"
