@@ -4,8 +4,8 @@
   "tags": [
     {
       "valueSource": "memory",
-      "name": "Cognizant",
-      "defaultValue": 100.0,
+      "name": "hey man ",
+      "defaultValue": 4040.0,
       "tagType": "AtomicTag",
       "dataType": "Float4"
     },
