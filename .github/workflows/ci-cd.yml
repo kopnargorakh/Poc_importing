@@ -1,6 +1,6 @@
 # GitHub Actions CI/CD Pipeline for Ignition 8.3
-# Staging Pipeline — triggers on Stagging branch
-name: Staging Pipeline
+# Local Pipeline — triggers on local branch
+name: Local Pipeline
 
 permissions:
   contents: read
@@ -12,10 +12,10 @@ concurrency:
 on:
   push:
     branches:
-      - Stagging
+      - local
   pull_request:
     branches:
-      - Stagging
+      - local
   workflow_dispatch:
 
 env:
@@ -56,7 +56,7 @@ jobs:
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: staging-artifacts-${{ github.sha }}
+          name: local-artifacts-${{ github.sha }}
           if-no-files-found: error
           path: |
             build/
@@ -82,12 +82,12 @@ jobs:
           chmod +x ./scripts/test-pylib.sh
           ./scripts/test-pylib.sh pylib/Mustry/Tests
 
-  deploy-staging:
-    name: Deploy to Staging
-    runs-on: Stagging
+  deploy-local:
+    name: Deploy to Local
+    runs-on: self-hosted
     needs: [build, test-pylib]
     environment:
-      name: staging
+      name: development
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -95,62 +95,21 @@ jobs:
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: staging-artifacts-${{ github.sha }}
+          name: local-artifacts-${{ github.sha }}
           path: ./artifacts
 
-      - name: Debug Tags and Paths
-        shell: powershell
-        run: |
-          Write-Host "=== CHECKING TAGS SOURCE ==="
-          $t1 = '.\artifacts\projects\TestProject\ignition\tags\tags.json'
-          $t2 = '.\projects\TestProject\ignition\tags\tags.json'
-          Write-Host "tags.json in artifacts/projects: $(Test-Path $t1)"
-          Write-Host "tags.json in projects:           $(Test-Path $t2)"
-
-          Write-Host ""
-          Write-Host "=== PROJECTS IN ARTIFACTS ==="
-          if (Test-Path '.\artifacts\projects') {
-            Get-ChildItem '.\artifacts\projects' -Directory | Select-Object Name
-          } else {
-            Write-Host "artifacts\projects NOT FOUND"
-          }
-
-          Write-Host ""
-          Write-Host "=== PROJECTS FOLDER ==="
-          if (Test-Path '.\projects') {
-            Get-ChildItem '.\projects' -Directory | Select-Object Name
-          } else {
-            Write-Host "projects NOT FOUND"
-          }
-
-          Write-Host ""
-          Write-Host "=== SERVER TAGS ROOT ==="
-          $tagsRoot = 'C:/Program Files/Inductive Automation/Ignition/data/config/resources/core/ignition/tag-definition/default'
-          Write-Host "tags_root exists: $(Test-Path $tagsRoot)"
-          if (Test-Path $tagsRoot) {
-            Get-ChildItem $tagsRoot | Select-Object Name
-          }
-
-          Write-Host ""
-          Write-Host "=== SERVER DEPLOY ROOT ==="
-          $deployRoot = 'C:\Program Files\Inductive Automation\Ignition\data\projects'
-          Write-Host "deploy_root exists: $(Test-Path $deployRoot)"
-          if (Test-Path $deployRoot) {
-            Get-ChildItem $deployRoot -Directory | Select-Object Name
-          }
-
-      - name: Deploy to Staging Gateway
+      - name: Deploy to Local Gateway
         shell: powershell
         env:
-          STAGING_GATEWAY_URL:     ${{ secrets.STAGE_GATEWAY_URL }}
-          STAGING_GATEWAY_API_KEY: ${{ secrets.STAGE_GATEWAY_API_KEY }}
-          STAGING_GATEWAY_PASS:    ${{ secrets.STAGE_GATEWAY_PASS }}
-          STAGING_GATEWAY_USER:    ${{ secrets.STAGGING_GATEWAY_USER }}
+          DEV_GATEWAY_URL:     ${{ secrets.DEV_GATEWAY_URL }}
+          DEV_GATEWAY_API_KEY: ${{ secrets.DEV_GATEWAY_API_KEY }}
+          DEV_GATEWAY_PASS:    ${{ secrets.DEV_GATEWAY_PASS }}
+          DEV_GATEWAY_USER:    ${{ secrets.DEV_GATEWAY_USER }}
         run: |
-          $env:STAGING_GATEWAY_URL     = "${{ secrets.STAGE_GATEWAY_URL }}"
-          $env:STAGING_GATEWAY_API_KEY = "${{ secrets.STAGE_GATEWAY_API_KEY }}"
-          $env:STAGING_GATEWAY_PASS    = "${{ secrets.STAGE_GATEWAY_PASS }}"
-          $env:STAGING_GATEWAY_USER    = "${{ secrets.STAGGING_GATEWAY_USER }}"
+          $env:DEV_GATEWAY_URL     = "${{ secrets.DEV_GATEWAY_URL }}"
+          $env:DEV_GATEWAY_API_KEY = "${{ secrets.DEV_GATEWAY_API_KEY }}"
+          $env:DEV_GATEWAY_PASS    = "${{ secrets.DEV_GATEWAY_PASS }}"
+          $env:DEV_GATEWAY_USER    = "${{ secrets.DEV_GATEWAY_USER }}"
 
           $projects = Get-ChildItem -Path '.\projects' -Directory
           if ($projects.Count -eq 0) {
@@ -160,8 +119,8 @@ jobs:
 
           foreach ($project in $projects) {
             $projectName = $project.Name
-            Write-Host "Deploying $projectName to Staging"
-            $bashCmd = "STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' STAGING_GATEWAY_USER='$env:STAGING_GATEWAY_USER' ./scripts/deploy-project.sh staging projects/$projectName"
+            Write-Host "Deploying $projectName to Local"
+            $bashCmd = "DEV_GATEWAY_URL='$env:DEV_GATEWAY_URL' DEV_GATEWAY_API_KEY='$env:DEV_GATEWAY_API_KEY' DEV_GATEWAY_PASS='$env:DEV_GATEWAY_PASS' DEV_GATEWAY_USER='$env:DEV_GATEWAY_USER' ./scripts/deploy-project.sh dev projects/$projectName"
             & 'C:\Program Files\Git\bin\bash.exe' -c $bashCmd
-            Write-Host "DONE: $projectName deployed to Staging"
+            Write-Host "DONE: $projectName deployed to Local"
           }
