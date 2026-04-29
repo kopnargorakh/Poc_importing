@@ -125,7 +125,7 @@ jobs:
 
           Write-Host ""
           Write-Host "=== SERVER TAGS ROOT ==="
-          $tagsRoot = 'C:\Program Files\Inductive Automation\Ignition\data\config\core\ignition\tag-definition\default'
+          $tagsRoot = 'C:/Program Files/Inductive Automation/Ignition/data/config/resources/core/ignition/tag-definition/default'
           Write-Host "tags_root exists: $(Test-Path $tagsRoot)"
           if (Test-Path $tagsRoot) {
             Get-ChildItem $tagsRoot | Select-Object Name
