@@ -4,7 +4,7 @@
   "tags": [
     {
       "valueSource": "memory",
-      "name": "hiello",
+      "name": "hey world how are u",
       "defaultValue": 670.0,
       "tagType": "AtomicTag",
       "dataType": "Float4"
