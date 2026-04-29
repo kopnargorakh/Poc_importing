@@ -56,7 +56,7 @@ jobs:
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: staging-artifacts-${{ github.sha }}    # ✅ unique name for staging
+          name: staging-artifacts-${{ github.sha }}
           if-no-files-found: error
           path: |
             build/
@@ -95,7 +95,7 @@ jobs:
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: staging-artifacts-${{ github.sha }}    # ✅ matches upload name
+          name: staging-artifacts-${{ github.sha }}
           path: ./artifacts
 
       - name: Deploy to Staging Gateway
@@ -111,7 +111,6 @@ jobs:
           $env:STAGING_GATEWAY_PASS    = "${{ secrets.STAGE_GATEWAY_PASS }}"
           $env:STAGING_GATEWAY_USER    = "${{ secrets.STAGGING_GATEWAY_USER }}"
 
-          # ✅ Smart path detection — works for combined AND standalone run
           $projectsPath = if (Test-Path ".\projects") { ".\projects" } else { ".\artifacts\projects" }
           $scriptBase   = if (Test-Path ".\projects") { "projects" }  else { "artifacts/projects" }
           Write-Host "Using projects path: $projectsPath"
@@ -129,5 +128,5 @@ jobs:
             Write-Host "=========================================="
             $bashCmd = "STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' STAGING_GATEWAY_USER='$env:STAGING_GATEWAY_USER' ./scripts/deploy-project.sh staging $scriptBase/$projectName"
             & "C:\Program Files\Git\bin\bash.exe" -c $bashCmd
-            Write-Host "✓ $projectName deployed to Staging"
+            Write-Host "DONE: $projectName deployed to Staging"
           }
