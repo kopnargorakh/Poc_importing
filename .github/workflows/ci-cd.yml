@@ -101,49 +101,42 @@ jobs:
       - name: Debug Tags and Paths
         shell: powershell
         run: |
-          Write-Host "=== CHECKING TAGS SOURCE IN ARTIFACTS ==="
-          $tagsSource = '.\artifacts\projects\TestProject\ignition\tags\tags.json'
-          Write-Host "tags.json exists in artifacts: $(Test-Path $tagsSource)"
+          Write-Host "=== CHECKING TAGS SOURCE ==="
+          $t1 = '.\artifacts\projects\TestProject\ignition\tags\tags.json'
+          $t2 = '.\projects\TestProject\ignition\tags\tags.json'
+          Write-Host "tags.json in artifacts/projects: $(Test-Path $t1)"
+          Write-Host "tags.json in projects:           $(Test-Path $t2)"
 
           Write-Host ""
-          Write-Host "=== CHECKING TAGS SOURCE IN PROJECTS ==="
-          $tagsSourceDirect = '.\projects\TestProject\ignition\tags\tags.json'
-          Write-Host "tags.json exists in projects: $(Test-Path $tagsSourceDirect)"
-
-          Write-Host ""
-          Write-Host "=== ARTIFACTS FOLDER FULL STRUCTURE ==="
-          if (Test-Path '.\artifacts') {
-            Get-ChildItem '.\artifacts' -Recurse | Select-Object FullName
+          Write-Host "=== PROJECTS IN ARTIFACTS ==="
+          if (Test-Path '.\artifacts\projects') {
+            Get-ChildItem '.\artifacts\projects' -Directory | Select-Object Name
           } else {
-            Write-Host "artifacts folder NOT FOUND"
+            Write-Host "artifacts\projects NOT FOUND"
           }
 
           Write-Host ""
-          Write-Host "=== PROJECTS FOLDER FULL STRUCTURE ==="
+          Write-Host "=== PROJECTS FOLDER ==="
           if (Test-Path '.\projects') {
-            Get-ChildItem '.\projects' -Recurse | Select-Object FullName
+            Get-ChildItem '.\projects' -Directory | Select-Object Name
           } else {
-            Write-Host "projects folder NOT FOUND"
+            Write-Host "projects NOT FOUND"
           }
 
           Write-Host ""
-          Write-Host "=== CHECKING TAGS ROOT ON SERVER ==="
+          Write-Host "=== SERVER TAGS ROOT ==="
           $tagsRoot = 'C:\Program Files\Inductive Automation\Ignition\data\config\core\ignition\tag-definition\default'
-          Write-Host "tags_root folder exists: $(Test-Path $tagsRoot)"
+          Write-Host "tags_root exists: $(Test-Path $tagsRoot)"
           if (Test-Path $tagsRoot) {
-            Write-Host "Current files in tags_root:"
-            Get-ChildItem $tagsRoot
-          } else {
-            Write-Host "tags_root does NOT exist on server"
+            Get-ChildItem $tagsRoot | Select-Object Name
           }
 
           Write-Host ""
-          Write-Host "=== CHECKING DEPLOY ROOT ON SERVER ==="
+          Write-Host "=== SERVER DEPLOY ROOT ==="
           $deployRoot = 'C:\Program Files\Inductive Automation\Ignition\data\projects'
           Write-Host "deploy_root exists: $(Test-Path $deployRoot)"
           if (Test-Path $deployRoot) {
-            Write-Host "Projects on server:"
-            Get-ChildItem $deployRoot
+            Get-ChildItem $deployRoot -Directory | Select-Object Name
           }
 
       - name: Deploy to Staging Gateway
