@@ -11,6 +11,13 @@
     },
     {
       "valueSource": "memory",
+      "name": "Cognizant_test",
+      "defaultValue": 100.0,
+      "tagType": "AtomicTag",
+      "dataType": "Float4"
+    },
+    {
+      "valueSource": "memory",
       "name": "Pressure",
       "defaultValue": 100.0,
       "tagType": "AtomicTag",
