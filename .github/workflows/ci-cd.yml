@@ -111,22 +111,17 @@ jobs:
           $env:STAGING_GATEWAY_PASS    = "${{ secrets.STAGE_GATEWAY_PASS }}"
           $env:STAGING_GATEWAY_USER    = "${{ secrets.STAGGING_GATEWAY_USER }}"
 
-          $projectsPath = if (Test-Path ".\projects") { ".\projects" } else { ".\artifacts\projects" }
-          $scriptBase   = if (Test-Path ".\projects") { "projects" }  else { "artifacts/projects" }
-          Write-Host "Using projects path: $projectsPath"
-
-          $projects = Get-ChildItem -Path $projectsPath -Directory
+          #  Exactly same as combined pipeline — projects/ direct path
+          $projects = Get-ChildItem -Path ".\projects" -Directory
           if ($projects.Count -eq 0) {
-            Write-Host "ERROR: No projects found in $projectsPath"
+            Write-Host "ERROR: No projects found"
             exit 1
           }
 
           foreach ($project in $projects) {
             $projectName = $project.Name
-            Write-Host "=========================================="
             Write-Host "Deploying $projectName to Staging"
-            Write-Host "=========================================="
-            $bashCmd = "STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' STAGING_GATEWAY_USER='$env:STAGING_GATEWAY_USER' ./scripts/deploy-project.sh staging $scriptBase/$projectName"
+            $bashCmd = "STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' STAGING_GATEWAY_USER='$env:STAGING_GATEWAY_USER' ./scripts/deploy-project.sh staging projects/$projectName"
             & "C:\Program Files\Git\bin\bash.exe" -c $bashCmd
             Write-Host "DONE: $projectName deployed to Staging"
           }
