@@ -102,44 +102,44 @@ jobs:
         shell: powershell
         run: |
           Write-Host "=== CHECKING TAGS SOURCE IN ARTIFACTS ==="
-          $tagsSource = ".\artifacts\projects\TestProject\ignition\tags\tags.json"
+          $tagsSource = '.\artifacts\projects\TestProject\ignition\tags\tags.json'
           Write-Host "tags.json exists in artifacts: $(Test-Path $tagsSource)"
 
           Write-Host ""
           Write-Host "=== CHECKING TAGS SOURCE IN PROJECTS ==="
-          $tagsSourceDirect = ".\projects\TestProject\ignition\tags\tags.json"
+          $tagsSourceDirect = '.\projects\TestProject\ignition\tags\tags.json'
           Write-Host "tags.json exists in projects: $(Test-Path $tagsSourceDirect)"
 
           Write-Host ""
           Write-Host "=== ARTIFACTS FOLDER FULL STRUCTURE ==="
-          if (Test-Path ".\artifacts") {
-            Get-ChildItem ".\artifacts" -Recurse | Select-Object FullName
+          if (Test-Path '.\artifacts') {
+            Get-ChildItem '.\artifacts' -Recurse | Select-Object FullName
           } else {
             Write-Host "artifacts folder NOT FOUND"
           }
 
           Write-Host ""
           Write-Host "=== PROJECTS FOLDER FULL STRUCTURE ==="
-          if (Test-Path ".\projects") {
-            Get-ChildItem ".\projects" -Recurse | Select-Object FullName
+          if (Test-Path '.\projects') {
+            Get-ChildItem '.\projects' -Recurse | Select-Object FullName
           } else {
             Write-Host "projects folder NOT FOUND"
           }
 
           Write-Host ""
           Write-Host "=== CHECKING TAGS ROOT ON SERVER ==="
-          $tagsRoot = "C:\Program Files\Inductive Automation\Ignition\data\config\core\ignition\tag-definition\default"
+          $tagsRoot = 'C:\Program Files\Inductive Automation\Ignition\data\config\core\ignition\tag-definition\default'
           Write-Host "tags_root folder exists: $(Test-Path $tagsRoot)"
           if (Test-Path $tagsRoot) {
             Write-Host "Current files in tags_root:"
             Get-ChildItem $tagsRoot
           } else {
-            Write-Host "tags_root does NOT exist — need to create it"
+            Write-Host "tags_root does NOT exist on server"
           }
 
           Write-Host ""
           Write-Host "=== CHECKING DEPLOY ROOT ON SERVER ==="
-          $deployRoot = "C:\Program Files\Inductive Automation\Ignition\data\projects"
+          $deployRoot = 'C:\Program Files\Inductive Automation\Ignition\data\projects'
           Write-Host "deploy_root exists: $(Test-Path $deployRoot)"
           if (Test-Path $deployRoot) {
             Write-Host "Projects on server:"
@@ -159,7 +159,7 @@ jobs:
           $env:STAGING_GATEWAY_PASS    = "${{ secrets.STAGE_GATEWAY_PASS }}"
           $env:STAGING_GATEWAY_USER    = "${{ secrets.STAGGING_GATEWAY_USER }}"
 
-          $projects = Get-ChildItem -Path ".\projects" -Directory
+          $projects = Get-ChildItem -Path '.\projects' -Directory
           if ($projects.Count -eq 0) {
             Write-Host "ERROR: No projects found"
             exit 1
@@ -169,6 +169,6 @@ jobs:
             $projectName = $project.Name
             Write-Host "Deploying $projectName to Staging"
             $bashCmd = "STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' STAGING_GATEWAY_USER='$env:STAGING_GATEWAY_USER' ./scripts/deploy-project.sh staging projects/$projectName"
-            & "C:\Program Files\Git\bin\bash.exe" -c $bashCmd
+            & 'C:\Program Files\Git\bin\bash.exe' -c $bashCmd
             Write-Host "DONE: $projectName deployed to Staging"
           }
