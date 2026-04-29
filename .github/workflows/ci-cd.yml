@@ -1,11 +1,14 @@
 # GitHub Actions CI/CD Pipeline for Ignition 8.3
 # Staging Pipeline — triggers on Stagging branch
 name: Staging Pipeline
+
 permissions:
   contents: read
+
 concurrency:
   group: ci-cd-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
 on:
   push:
     branches:
@@ -14,8 +17,10 @@ on:
     branches:
       - Stagging
   workflow_dispatch:
+
 env:
   BUILD_CONFIGURATION: Release
+
 jobs:
   build:
     name: Build and Validate
@@ -23,10 +28,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Validate Project Names and Structure
         run: |
           chmod +x ./scripts/validate-names.sh
           ./scripts/validate-names.sh ./projects
+
       - name: Package All Projects
         run: |
           set -e
@@ -45,10 +52,11 @@ jobs:
             done
           fi
           ls -lh build/
+
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts-Stagging-${{ github.sha }}
+          name: staging-artifacts-${{ github.sha }}    # ✅ unique name for staging
           if-no-files-found: error
           path: |
             build/
@@ -56,20 +64,24 @@ jobs:
             config/
             projects/
             migrations/
+
   test-pylib:
     name: Test Python Libraries
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
       - name: Run pylib tests
         run: |
           chmod +x ./scripts/test-pylib.sh
           ./scripts/test-pylib.sh pylib/Mustry/Tests
+
   deploy-staging:
     name: Deploy to Staging
     runs-on: Stagging
@@ -79,11 +91,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: build-artifacts-Stagging-${{ github.sha }}
+          name: staging-artifacts-${{ github.sha }}    # ✅ matches upload name
           path: ./artifacts
+
       - name: Deploy to Staging Gateway
         shell: powershell
         env:
@@ -96,9 +110,24 @@ jobs:
           $env:STAGING_GATEWAY_API_KEY = "${{ secrets.STAGE_GATEWAY_API_KEY }}"
           $env:STAGING_GATEWAY_PASS    = "${{ secrets.STAGE_GATEWAY_PASS }}"
           $env:STAGING_GATEWAY_USER    = "${{ secrets.STAGGING_GATEWAY_USER }}"
-          $projects = Get-ChildItem -Path ".\artifacts\projects" -Directory
+
+          # ✅ Smart path detection — works for combined AND standalone run
+          $projectsPath = if (Test-Path ".\projects") { ".\projects" } else { ".\artifacts\projects" }
+          $scriptBase   = if (Test-Path ".\projects") { "projects" }  else { "artifacts/projects" }
+          Write-Host "Using projects path: $projectsPath"
+
+          $projects = Get-ChildItem -Path $projectsPath -Directory
+          if ($projects.Count -eq 0) {
+            Write-Host "ERROR: No projects found in $projectsPath"
+            exit 1
+          }
+
           foreach ($project in $projects) {
-            Write-Host "--- Deploying $($project.Name) to Staging ---"
-            $bashCmd = "STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' STAGING_GATEWAY_USER='$env:STAGING_GATEWAY_USER' ./scripts/deploy-project.sh staging artifacts/projects/$($project.Name)"
+            $projectName = $project.Name
+            Write-Host "=========================================="
+            Write-Host "Deploying $projectName to Staging"
+            Write-Host "=========================================="
+            $bashCmd = "STAGING_GATEWAY_URL='$env:STAGING_GATEWAY_URL' STAGING_GATEWAY_API_KEY='$env:STAGING_GATEWAY_API_KEY' STAGING_GATEWAY_PASS='$env:STAGING_GATEWAY_PASS' STAGING_GATEWAY_USER='$env:STAGING_GATEWAY_USER' ./scripts/deploy-project.sh staging $scriptBase/$projectName"
             & "C:\Program Files\Git\bin\bash.exe" -c $bashCmd
+            Write-Host "✓ $projectName deployed to Staging"
           }
