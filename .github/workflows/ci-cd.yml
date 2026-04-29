@@ -98,6 +98,54 @@ jobs:
           name: staging-artifacts-${{ github.sha }}
           path: ./artifacts
 
+      - name: Debug Tags and Paths
+        shell: powershell
+        run: |
+          Write-Host "=== CHECKING TAGS SOURCE IN ARTIFACTS ==="
+          $tagsSource = ".\artifacts\projects\TestProject\ignition\tags\tags.json"
+          Write-Host "tags.json exists in artifacts: $(Test-Path $tagsSource)"
+
+          Write-Host ""
+          Write-Host "=== CHECKING TAGS SOURCE IN PROJECTS ==="
+          $tagsSourceDirect = ".\projects\TestProject\ignition\tags\tags.json"
+          Write-Host "tags.json exists in projects: $(Test-Path $tagsSourceDirect)"
+
+          Write-Host ""
+          Write-Host "=== ARTIFACTS FOLDER FULL STRUCTURE ==="
+          if (Test-Path ".\artifacts") {
+            Get-ChildItem ".\artifacts" -Recurse | Select-Object FullName
+          } else {
+            Write-Host "artifacts folder NOT FOUND"
+          }
+
+          Write-Host ""
+          Write-Host "=== PROJECTS FOLDER FULL STRUCTURE ==="
+          if (Test-Path ".\projects") {
+            Get-ChildItem ".\projects" -Recurse | Select-Object FullName
+          } else {
+            Write-Host "projects folder NOT FOUND"
+          }
+
+          Write-Host ""
+          Write-Host "=== CHECKING TAGS ROOT ON SERVER ==="
+          $tagsRoot = "C:\Program Files\Inductive Automation\Ignition\data\config\core\ignition\tag-definition\default"
+          Write-Host "tags_root folder exists: $(Test-Path $tagsRoot)"
+          if (Test-Path $tagsRoot) {
+            Write-Host "Current files in tags_root:"
+            Get-ChildItem $tagsRoot
+          } else {
+            Write-Host "tags_root does NOT exist — need to create it"
+          }
+
+          Write-Host ""
+          Write-Host "=== CHECKING DEPLOY ROOT ON SERVER ==="
+          $deployRoot = "C:\Program Files\Inductive Automation\Ignition\data\projects"
+          Write-Host "deploy_root exists: $(Test-Path $deployRoot)"
+          if (Test-Path $deployRoot) {
+            Write-Host "Projects on server:"
+            Get-ChildItem $deployRoot
+          }
+
       - name: Deploy to Staging Gateway
         shell: powershell
         env:
@@ -111,7 +159,6 @@ jobs:
           $env:STAGING_GATEWAY_PASS    = "${{ secrets.STAGE_GATEWAY_PASS }}"
           $env:STAGING_GATEWAY_USER    = "${{ secrets.STAGGING_GATEWAY_USER }}"
 
-          #  Exactly same as combined pipeline — projects/ direct path
           $projects = Get-ChildItem -Path ".\projects" -Directory
           if ($projects.Count -eq 0) {
             Write-Host "ERROR: No projects found"
