@@ -2,7 +2,7 @@
 # Development Environment — 172.16.3.148
 environment: dev
 deploy_root: "C:/Program Files/Inductive Automation/Ignition/data/projects"
-tags_root: "C:/Program Files/Inductive Automation/Ignition/data/config/core/ignition/tag-definition/default"
+tags_root: "C:/Program Files/Inductive Automation/Ignition/data/config/resources/core/ignition/tag-definition/default"
 gateway_config_root: "C:/Program Files/Inductive Automation/Ignition/data/config"
 
 gateway:
